@@ -299,6 +299,16 @@ function generateMethodForms() {
           label.innerText = 'ERC20 Contract Address:';
         } else if (input.name === '_transferAmount') {
           label.innerText = 'Withdraw Amount:';
+
+          // Create Max button and append to label
+          const maxButton = document.createElement('button');
+          maxButton.type = 'button';
+          maxButton.className = 'max-button';
+          maxButton.innerText = 'Max';
+          maxButton.addEventListener('click', async () => {
+            await handleMaxButtonClick(form);
+          });
+          label.appendChild(maxButton);
         } else {
           label.innerText = `${input.name} (${input.type}):`;
         }
@@ -381,22 +391,7 @@ function generateMethodForms() {
         inputElement.className = 'input';
         inputElement.id = input.name;
         inputElement.name = input.name;
-
-        const inputWrapper = document.createElement('div');
-        inputWrapper.className = 'input-wrapper';
-
-        inputWrapper.appendChild(inputElement);
-
-        const maxButton = document.createElement('button');
-        maxButton.type = 'button';
-        maxButton.className = 'max-button';
-        maxButton.innerText = 'Max';
-        maxButton.addEventListener('click', async () => {
-          await handleMaxButtonClick(form);
-        });
-
-        inputWrapper.appendChild(maxButton);
-        formGroup.appendChild(inputWrapper);
+        formGroup.appendChild(inputElement);
       } else {
         if (input.type.endsWith('[]')) {
           inputElement = document.createElement('textarea');
@@ -416,7 +411,6 @@ function generateMethodForms() {
         formGroup.appendChild(inputElement);
       }
 
-      formGroup.appendChild(inputElement);
       form.appendChild(formGroup);
     });
 
@@ -619,20 +613,9 @@ async function handleFormSubmit(event) {
       erc20ContractAddress = customAddress;
     }
 
-    // Handle Max Amounts
+    // Handle Amount
     const amountInput = form.querySelector('input[name="_transferAmount"]');
     let transferAmountValue = amountInput.value.trim();
-
-    // Convert transferAmountValue to BigNumber
-    let transferAmount;
-    if (transferAmountValue.toLowerCase() === 'max' || transferAmountValue === '') {
-      transferAmount = 'max';
-    } else {
-      if (!/^\d+(\.\d+)?$/.test(transferAmountValue)) {
-        throw new Error('Invalid number for amount');
-      }
-      transferAmount = ethers.utils.parseUnits(transferAmountValue, 18);
-    }
 
     if (methodName === 'transferEscrow' && tokenIdValue === 'all') {
       // Switch to batchTransferEscrow
@@ -659,23 +642,54 @@ async function handleFormSubmit(event) {
 
       // Prepare _transferAmounts array
       let _transferAmounts = [];
-      if (transferAmount === 'max') {
-        // Use individual max balances
-        _transferAmounts = await Promise.all(
-          _tokenIds.map(async (tokenId) => {
-            const gotchi = ownedAavegotchis.find((g) => g.tokenId.eq(tokenId));
-            const escrowWallet = gotchi.escrow;
-            const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
-            const balance = await tokenContract.balanceOf(escrowWallet);
-            return balance;
-          })
-        );
-      } else {
-        // Use the specified amount for each Aavegotchi
-        _transferAmounts = _tokenIds.map(() => transferAmount);
+
+      if (transferAmountValue === '') {
+        throw new Error('Please enter an amount or click Max.');
       }
+
+      if (!/^\d+(\.\d+)?$/.test(transferAmountValue)) {
+        throw new Error('Invalid number for amount');
+      }
+
+      const totalTransferAmount = ethers.utils.parseUnits(transferAmountValue, 18);
+
+      // Get individual balances
+      const individualBalances = await Promise.all(
+        _tokenIds.map(async (tokenId) => {
+          const gotchi = ownedAavegotchis.find((g) => g.tokenId.eq(tokenId));
+          const escrowWallet = gotchi.escrow;
+          const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
+          const balance = await tokenContract.balanceOf(escrowWallet);
+          return balance;
+        })
+      );
+
+      const totalAvailableBalance = individualBalances.reduce((acc, balance) => acc.add(balance), ethers.BigNumber.from(0));
+
+      if (totalTransferAmount.gt(totalAvailableBalance)) {
+        throw new Error('The total amount exceeds the total available balance across all Aavegotchis.');
+      }
+
+      // Distribute equally
+      const numAavegotchis = _tokenIds.length;
+      const amountPerAavegotchi = totalTransferAmount.div(numAavegotchis);
+      const remainder = totalTransferAmount.mod(numAavegotchis);
+
+      for (let i = 0; i < numAavegotchis; i++) {
+        let amount = amountPerAavegotchi;
+        if (i === numAavegotchis - 1) {
+          amount = amount.add(remainder); // Add remainder to last
+        }
+        // Ensure amount does not exceed individual balance
+        if (amount.gt(individualBalances[i])) {
+          amount = individualBalances[i];
+        }
+        _transferAmounts.push(amount);
+      }
+
       args.push(_transferAmounts);
-    } else if (methodName === 'transferEscrow') {
+
+    } else {
       // Single Aavegotchi
       const _tokenId = ethers.BigNumber.from(tokenIdValue);
       args.push(_tokenId);
@@ -689,18 +703,17 @@ async function handleFormSubmit(event) {
       args.push(erc20ContractAddress);
       args.push(userAddress); // _recipient
 
-      if (transferAmount === 'max') {
-        // Get max balance
-        const gotchi = ownedAavegotchis.find((g) => g.tokenId.eq(_tokenId));
-        const escrowWallet = gotchi.escrow;
-        const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
-        transferAmount = await tokenContract.balanceOf(escrowWallet);
+      if (transferAmountValue === '') {
+        throw new Error('Please enter an amount or click Max.');
       }
+
+      if (!/^\d+(\.\d+)?$/.test(transferAmountValue)) {
+        throw new Error('Invalid number for amount');
+      }
+
+      const transferAmount = ethers.utils.parseUnits(transferAmountValue, 18);
+
       args.push(transferAmount);
-    } else {
-      // Other methods remain unchanged
-      // Existing code to handle other methods
-      // ...
     }
 
     const tx = await contract[methodName](...args);
@@ -929,19 +942,17 @@ async function updateMaxButton(form) {
 
       // Store individual balances for batch transfer
       maxButton.dataset.individualBalances = balances.map((b) => b.toString()).join(',');
+      maxButton.dataset.maxValue = totalBalance.toString();
 
-      const formattedTotal = ethers.utils.formatUnits(totalBalance, 18);
-      amountInput.value = 'Max'; // Indicate max amount
+      // Do not set amountInput.value here
     } else {
       const gotchi = ownedAavegotchis.find((g) => g.tokenId.toString() === tokenIdValue);
       if (!gotchi) throw new Error('Selected Aavegotchi not found.');
       const escrowWallet = gotchi.escrow;
       totalBalance = await tokenContract.balanceOf(escrowWallet);
-      const formattedBalance = ethers.utils.formatUnits(totalBalance, 18);
-      amountInput.value = formattedBalance;
+      maxButton.dataset.maxValue = totalBalance.toString();
     }
 
-    maxButton.dataset.maxValue = totalBalance.toString();
     maxButton.disabled = false;
     maxButton.innerText = 'Max';
   } catch (error) {
@@ -955,18 +966,12 @@ async function updateMaxButton(form) {
 async function handleMaxButtonClick(form) {
   const amountInput = form.querySelector('input[name="_transferAmount"]');
   const maxButton = form.querySelector('.max-button');
-  const tokenIdSelect = form.querySelector('select[name="_tokenId"]');
-  const tokenIdValue = tokenIdSelect ? tokenIdSelect.value : null;
+  const maxValue = maxButton.dataset.maxValue;
 
-  if (tokenIdValue === 'all') {
-    amountInput.value = 'Max';
-  } else {
-    const maxValue = maxButton.dataset.maxValue;
-    if (maxValue) {
-      const decimals = 18; // Assuming 18 decimals for tokens
-      const formattedValue = ethers.utils.formatUnits(maxValue, decimals);
-      amountInput.value = formattedValue;
-    }
+  if (maxValue) {
+    const decimals = 18; // Assuming 18 decimals for tokens
+    const formattedValue = ethers.utils.formatUnits(maxValue, decimals);
+    amountInput.value = formattedValue;
   }
 }
 
