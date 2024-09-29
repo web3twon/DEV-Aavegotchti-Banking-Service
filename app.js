@@ -209,7 +209,7 @@ async function connectWallet() {
     connectWalletButton.innerText = `Connected: ${shortAddress}`;
 
     await fetchAndDisplayAavegotchis(address);
-    generateMethodForms();
+    generateMethodForms(); // Generate forms after fetching Aavegotchis
     window.ethereum.on('accountsChanged', handleAccountsChanged);
     window.ethereum.on('chainChanged', handleChainChanged);
     initializeCopyButtons();
@@ -339,6 +339,9 @@ function generateMethodForms() {
         }
 
         formGroup.appendChild(inputElement);
+
+        // Add event listener to update Max button when selection changes
+        inputElement.addEventListener('change', () => updateMaxButton(form));
       } else if (methodName === 'transferEscrow' && input.name === '_erc20Contract') {
         inputElement = document.createElement('select');
         inputElement.className = 'select';
@@ -427,6 +430,9 @@ function generateMethodForms() {
 
     // Add event listeners for updating Max button when selections change
     form.addEventListener('change', () => updateMaxButton(form));
+
+    // **Call updateMaxButton to initialize the Max button**
+    updateMaxButton(form);
   });
 
   // Include code for extra tools (omitted for brevity, remains unchanged)
@@ -437,7 +443,7 @@ function generateMethodForms() {
 // Function to Generate Extra Tools (Unchanged)
 function generateExtraTools(facetMethods, extraMethodNames) {
   // Existing code for generating extra tools forms
-  // ...
+  // ... (you can keep the existing implementation here)
 }
 
 // Function to Get Methods for a Facet
