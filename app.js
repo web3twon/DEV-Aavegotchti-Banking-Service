@@ -32,7 +32,7 @@ const ghstABI = [
   },
 ];
 
-// Combined ABI: EscrowFacet + AavegotchiFacet
+// Combined ABI: EscrowFacet + AavegotchiFacet + LendingFacet
 const combinedABI = [
   // EscrowFacet Functions
   {
@@ -128,6 +128,14 @@ const combinedABI = [
     stateMutability: 'view',
     type: 'function',
   },
+  // LendingFacet Functions
+  {
+    inputs: [{ internalType: 'uint32', name: '_erc721TokenId', type: 'uint32' }],
+    name: 'isAavegotchiLent',
+    outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
 ];
 
 // Predefined ERC20 Tokens
@@ -145,6 +153,7 @@ let signer;
 let contract;
 let ghstContract;
 let userAddress;
+let ownedAavegotchis = []; // Store owned Aavegotchis
 
 // DOM Elements
 const connectWalletButton = document.getElementById('connect-wallet');
@@ -198,8 +207,8 @@ async function connectWallet() {
 
     connectWalletButton.innerText = `Connected: ${shortAddress}`;
 
-    generateMethodForms();
     await fetchAndDisplayAavegotchis(address);
+    generateMethodForms();
     window.ethereum.on('accountsChanged', handleAccountsChanged);
     window.ethereum.on('chainChanged', handleChainChanged);
     initializeCopyButtons();
@@ -270,8 +279,9 @@ function generateMethodForms() {
     form.setAttribute('data-method', methodName);
     form.addEventListener('submit', handleFormSubmit);
 
+    // Include _tokenId in the inputs
     method.inputs.forEach((input) => {
-      if (input.name === '_tokenId' || (methodName === 'transferEscrow' && input.name === '_recipient')) {
+      if (methodName === 'transferEscrow' && input.name === '_recipient') {
         return;
       }
 
@@ -282,7 +292,9 @@ function generateMethodForms() {
       label.setAttribute('for', input.name);
 
       if (methodName === 'transferEscrow') {
-        if (input.name === '_erc20Contract') {
+        if (input.name === '_tokenId') {
+          label.innerText = 'Select Aavegotchi:';
+        } else if (input.name === '_erc20Contract') {
           label.innerText = 'ERC20 Contract Address:';
         } else if (input.name === '_transferAmount') {
           label.innerText = 'Withdraw Amount:';
@@ -296,7 +308,30 @@ function generateMethodForms() {
       formGroup.appendChild(label);
 
       let inputElement;
-      if (methodName === 'transferEscrow' && input.name === '_erc20Contract') {
+      if (input.name === '_tokenId') {
+        // Create a dropdown for owned Aavegotchis
+        inputElement = document.createElement('select');
+        inputElement.className = 'select';
+        inputElement.id = input.name;
+        inputElement.name = input.name;
+
+        ownedAavegotchis.forEach((aavegotchi) => {
+          const option = document.createElement('option');
+          option.value = aavegotchi.tokenId.toString();
+          option.innerText = `${aavegotchi.name} (ID: ${aavegotchi.tokenId})`;
+          inputElement.appendChild(option);
+        });
+
+        if (ownedAavegotchis.length === 0) {
+          const option = document.createElement('option');
+          option.value = '';
+          option.innerText = 'No owned Aavegotchis available';
+          inputElement.appendChild(option);
+          inputElement.disabled = true;
+        }
+
+        formGroup.appendChild(inputElement);
+      } else if (methodName === 'transferEscrow' && input.name === '_erc20Contract') {
         inputElement = document.createElement('select');
         inputElement.className = 'select';
         inputElement.id = input.name;
@@ -410,10 +445,6 @@ function generateMethodForms() {
       form.addEventListener('submit', handleFormSubmit);
 
       method.inputs.forEach((input) => {
-        if (input.name === '_tokenId' || (methodName === 'transferEscrow' && input.name === '_recipient')) {
-          return;
-        }
-
         const formGroup = document.createElement('div');
         formGroup.className = 'form-group';
 
@@ -478,12 +509,14 @@ function getFacetMethods(facet) {
     EscrowFacet: {
       transferEscrow: {
         inputs: [
+          { name: '_tokenId', type: 'uint256' },
           { name: '_erc20Contract', type: 'address' },
           { name: '_transferAmount', type: 'uint256' },
         ],
       },
       batchTransferEscrow: {
         inputs: [
+          { name: '_tokenIds', type: 'uint256[]' },
           { name: '_erc20Contracts', type: 'address[]' },
           { name: '_recipients', type: 'address[]' },
           { name: '_transferAmounts', type: 'uint256[]' },
@@ -491,20 +524,26 @@ function getFacetMethods(facet) {
       },
       batchDepositERC20: {
         inputs: [
+          { name: '_tokenIds', type: 'uint256[]' },
           { name: '_erc20Contracts', type: 'address[]' },
           { name: '_values', type: 'uint256[]' },
         ],
       },
       batchDepositGHST: {
-        inputs: [{ name: '_values', type: 'uint256[]' }],
+        inputs: [
+          { name: '_tokenIds', type: 'uint256[]' },
+          { name: '_values', type: 'uint256[]' },
+        ],
       },
       depositERC20: {
         inputs: [
+          { name: '_tokenId', type: 'uint256' },
           { name: '_erc20Contract', type: 'address' },
           { name: '_value', type: 'uint256' },
         ],
       },
     },
+    // Add LendingFacet if needed
   };
 
   return facets[facet];
@@ -522,13 +561,41 @@ async function handleFormSubmit(event) {
 
   const args = [];
   try {
-    const _tokenId = ethers.BigNumber.from('15615');
+    // Handle _tokenId or _tokenIds
     const methodsRequiringTokenId = ['transferEscrow', 'depositERC20'];
+    const methodsRequiringTokenIds = ['batchTransferEscrow', 'batchDepositERC20', 'batchDepositGHST'];
     if (methodsRequiringTokenId.includes(methodName)) {
+      const _tokenId = ethers.BigNumber.from(formData.get('_tokenId'));
       args.push(_tokenId);
+
+      // Validate ownership
+      const ownedTokenIds = ownedAavegotchis.map((gotchi) => gotchi.tokenId.toString());
+      if (!ownedTokenIds.includes(_tokenId.toString())) {
+        throw new Error('You do not own the selected Aavegotchi.');
+      }
+    } else if (methodsRequiringTokenIds.includes(methodName)) {
+      let _tokenIds = formData.get('_tokenIds')?.trim() || '';
+      _tokenIds = _tokenIds.split(',').map((id) => id.trim()).filter((id) => id !== '');
+      _tokenIds = _tokenIds.map((id) => ethers.BigNumber.from(id));
+
+      // Validate ownership
+      const ownedTokenIds = ownedAavegotchis.map((gotchi) => gotchi.tokenId.toString());
+      const invalidIds = _tokenIds.filter((id) => !ownedTokenIds.includes(id.toString()));
+      if (invalidIds.length > 0) {
+        throw new Error(`You do not own the Aavegotchis with IDs: ${invalidIds.join(', ')}`);
+      }
+      args.push(_tokenIds);
     }
 
     for (const input of method.inputs) {
+      if (
+        (methodsRequiringTokenId.includes(methodName) && input.name === '_tokenId') ||
+        (methodsRequiringTokenIds.includes(methodName) && input.name === '_tokenIds') ||
+        (methodName === 'transferEscrow' && input.name === '_recipient')
+      ) {
+        continue;
+      }
+
       let value = formData.get(input.name)?.trim() || '';
 
       const isAmountField = ['_transferAmount', '_transferAmounts', '_value', '_values'].includes(input.name);
@@ -581,11 +648,16 @@ async function handleFormSubmit(event) {
       args.push(value);
     }
 
-    if (methodName === 'transferEscrow') {
+    if (methodName === 'transferEscrow' || methodName === 'batchTransferEscrow') {
       if (!userAddress) {
         throw new Error('User address not found. Please reconnect your wallet.');
       }
-      args.splice(2, 0, userAddress);
+      if (methodName === 'transferEscrow') {
+        args.splice(2, 0, userAddress); // Insert _recipient at the correct position
+      } else if (methodName === 'batchTransferEscrow') {
+        const _recipients = Array(args[0].length).fill(userAddress);
+        args.splice(2, 0, _recipients); // Insert _recipients at the correct position
+      }
     }
 
     const tx = await contract[methodName](...args);
@@ -594,7 +666,7 @@ async function handleFormSubmit(event) {
     alert('Transaction confirmed!');
   } catch (error) {
     console.error(error);
-    alert(`Error: ${error.message}`);
+    alert(`Error: ${error.data?.message || error.message}`);
   }
 }
 
@@ -632,7 +704,7 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
 
-    const headers = ['Token ID', 'Name', 'Escrow Wallet', 'GHST Balance'];
+    const headers = ['Token ID', 'Name', 'Escrow Wallet', 'GHST Balance', 'Status'];
     headers.forEach((headerText) => {
       const th = document.createElement('th');
       th.innerText = headerText;
@@ -643,10 +715,26 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     table.appendChild(thead);
 
     const tbody = document.createElement('tbody');
-    const balancePromises = aavegotchis.map((aavegotchi) => ghstContract.balanceOf(aavegotchi.escrow));
+
+    // Fetch balances and lending status in parallel
+    const balancePromises = [];
+    const lendingStatusPromises = [];
+    for (const aavegotchi of aavegotchis) {
+      balancePromises.push(ghstContract.balanceOf(aavegotchi.escrow));
+      lendingStatusPromises.push(contract.isAavegotchiLent(aavegotchi.tokenId));
+    }
+
     const balances = await Promise.all(balancePromises);
+    const lendingStatuses = await Promise.all(lendingStatusPromises);
 
     aavegotchis.forEach((aavegotchi, index) => {
+      const isLent = lendingStatuses[index];
+      const isOwned = !isLent;
+
+      if (isOwned) {
+        ownedAavegotchis.push(aavegotchi);
+      }
+
       const row = document.createElement('tr');
 
       const tokenId = aavegotchi.tokenId.toString();
@@ -696,6 +784,18 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       ghstBalanceCell.setAttribute('data-label', 'GHST Balance');
       ghstBalanceCell.innerText = ghstBalance;
       row.appendChild(ghstBalanceCell);
+
+      // Status Cell
+      const statusCell = document.createElement('td');
+      statusCell.setAttribute('data-label', 'Status');
+      if (isOwned) {
+        statusCell.innerText = 'Owned';
+        statusCell.className = 'status-owned';
+      } else {
+        statusCell.innerText = 'Rented';
+        statusCell.className = 'status-rented';
+      }
+      row.appendChild(statusCell);
 
       tbody.appendChild(row);
     });
