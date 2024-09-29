@@ -431,19 +431,121 @@ function generateMethodForms() {
     // Add event listeners for updating Max button when selections change
     form.addEventListener('change', () => updateMaxButton(form));
 
-    // **Call updateMaxButton to initialize the Max button**
+    // Call updateMaxButton to initialize the Max button
     updateMaxButton(form);
   });
 
-  // Include code for extra tools (omitted for brevity, remains unchanged)
-  // ... (existing code for extra tools)
+  // Include code for extra tools
   generateExtraTools(facetMethods, extraMethodNames);
 }
 
-// Function to Generate Extra Tools (Unchanged)
+// Function to Generate Extra Tools
 function generateExtraTools(facetMethods, extraMethodNames) {
-  // Existing code for generating extra tools forms
-  // ... (you can keep the existing implementation here)
+  if (extraMethodNames.length > 0) {
+    const extraToolsContainer = document.createElement('div');
+    extraToolsContainer.className = 'form-container';
+
+    const extraToolsHeader = document.createElement('div');
+    extraToolsHeader.className = 'form-header';
+    extraToolsHeader.style.cursor = 'pointer';
+
+    const extraToolsTitle = document.createElement('h3');
+    extraToolsTitle.innerText = 'Extra Tools';
+    extraToolsHeader.appendChild(extraToolsTitle);
+
+    const toggleIcon = document.createElement('span');
+    toggleIcon.className = 'toggle-icon collapsed';
+    toggleIcon.innerHTML = '&#9660;';
+    extraToolsHeader.appendChild(toggleIcon);
+
+    extraToolsContainer.appendChild(extraToolsHeader);
+
+    const collapsibleContent = document.createElement('div');
+    collapsibleContent.className = 'collapsible-content';
+
+    extraMethodNames.forEach((methodName) => {
+      const method = facetMethods[methodName];
+      const formContainer = document.createElement('div');
+      formContainer.className = 'form-container-inner';
+
+      const formHeader = document.createElement('div');
+      formHeader.className = 'form-header';
+
+      const formTitle = document.createElement('h3');
+      formTitle.innerText = methodName;
+      formHeader.appendChild(formTitle);
+
+      const formToggleIcon = document.createElement('span');
+      formToggleIcon.className = 'toggle-icon collapsed';
+      formToggleIcon.innerHTML = '&#9660;';
+      formHeader.appendChild(formToggleIcon);
+
+      formContainer.appendChild(formHeader);
+
+      const formCollapsibleContent = document.createElement('div');
+      formCollapsibleContent.className = 'collapsible-content';
+
+      const form = document.createElement('form');
+      form.setAttribute('data-method', methodName);
+      form.addEventListener('submit', handleFormSubmit);
+
+      method.inputs.forEach((input) => {
+        const formGroup = document.createElement('div');
+        formGroup.className = 'form-group';
+
+        const label = document.createElement('label');
+        label.setAttribute('for', input.name);
+        label.innerText = `${input.name} (${input.type}):`;
+
+        formGroup.appendChild(label);
+
+        let inputElement;
+        if (input.type.endsWith('[]')) {
+          inputElement = document.createElement('textarea');
+          inputElement.className = 'textarea';
+          inputElement.placeholder = 'Enter comma-separated values';
+        } else {
+          inputElement = document.createElement('input');
+          inputElement.type = 'text';
+          inputElement.className = 'input';
+          if (input.type.startsWith('address')) {
+            inputElement.placeholder = '0x...';
+          }
+        }
+
+        inputElement.id = input.name;
+        inputElement.name = input.name;
+        formGroup.appendChild(inputElement);
+        form.appendChild(formGroup);
+      });
+
+      const submitButton = document.createElement('button');
+      submitButton.type = 'submit';
+      submitButton.className = 'button submit-button';
+      submitButton.innerText = 'Submit';
+      form.appendChild(submitButton);
+
+      formCollapsibleContent.appendChild(form);
+      formContainer.appendChild(formCollapsibleContent);
+      collapsibleContent.appendChild(formContainer);
+
+      toggleCollapse(formCollapsibleContent, formToggleIcon, false);
+
+      formHeader.addEventListener('click', () => {
+        const isExpanded = formCollapsibleContent.classList.contains('expanded');
+        toggleCollapse(formCollapsibleContent, formToggleIcon, !isExpanded);
+      });
+    });
+
+    extraToolsContainer.appendChild(collapsibleContent);
+    methodFormsContainer.appendChild(extraToolsContainer);
+    toggleCollapse(collapsibleContent, toggleIcon, false);
+
+    extraToolsHeader.addEventListener('click', () => {
+      const isExpanded = collapsibleContent.classList.contains('expanded');
+      toggleCollapse(collapsibleContent, toggleIcon, !isExpanded);
+    });
+  }
 }
 
 // Function to Get Methods for a Facet
@@ -486,7 +588,7 @@ function getFacetMethods(facet) {
         ],
       },
     },
-    // Add LendingFacet if needed
+    // Add other facets if needed
   };
 
   return facets[facet];
@@ -524,7 +626,11 @@ async function handleFormSubmit(event) {
       }
     } else if (methodsRequiringTokenIds.includes(methodName)) {
       let _tokenIds = formData.get('_tokenIds')?.trim() || '';
-      _tokenIds = _tokenIds.split(',').map((id) => id.trim()).filter((id) => id !== '');
+      if (_tokenIds === 'all') {
+        _tokenIds = ownedAavegotchis.map((gotchi) => gotchi.tokenId.toString());
+      } else {
+        _tokenIds = _tokenIds.split(',').map((id) => id.trim()).filter((id) => id !== '');
+      }
       _tokenIds = _tokenIds.map((id) => ethers.BigNumber.from(id));
 
       // Validate ownership
@@ -619,7 +725,7 @@ async function handleFormSubmit(event) {
   }
 }
 
-// Function to Toggle Collapse (Unchanged)
+// Function to Toggle Collapse
 function toggleCollapse(contentElement, iconElement, expand) {
   if (expand) {
     contentElement.classList.add('expanded');
