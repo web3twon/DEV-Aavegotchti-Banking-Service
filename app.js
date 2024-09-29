@@ -623,12 +623,32 @@ async function handleFormSubmit(event) {
       method = facetMethods[methodName];
 
       // Prepare arguments
-      const _tokenIds = ownedAavegotchis.map((gotchi) => ethers.BigNumber.from(gotchi.tokenId));
+      let _tokenIds = ownedAavegotchis.map((gotchi) => ethers.BigNumber.from(gotchi.tokenId));
 
       // Validate ownership
       if (_tokenIds.length === 0) {
         throw new Error('You do not own any Aavegotchis.');
       }
+
+      // Filter Aavegotchis with positive balance of the selected token
+      const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
+      const balancePromises = _tokenIds.map(async (tokenId) => {
+        const gotchi = ownedAavegotchis.find((g) => g.tokenId.eq(tokenId));
+        const escrowWallet = gotchi.escrow;
+        const balance = await tokenContract.balanceOf(escrowWallet);
+        return { tokenId, balance };
+      });
+
+      const balancesResult = await Promise.all(balancePromises);
+      const filteredData = balancesResult.filter(({ balance }) => !balance.isZero());
+
+      if (filteredData.length === 0) {
+        throw new Error('None of your Aavegotchis hold the selected token.');
+      }
+
+      // Prepare filtered arrays
+      _tokenIds = filteredData.map(({ tokenId }) => tokenId);
+      const individualBalances = filteredData.map(({ balance }) => balance);
 
       args.push(_tokenIds);
 
@@ -653,28 +673,10 @@ async function handleFormSubmit(event) {
 
       const totalTransferAmount = ethers.utils.parseUnits(transferAmountValue, 18);
 
-      // Retrieve individual balances stored during Max button click
-      const maxButton = form.querySelector('.max-button');
-      let individualBalances = maxButton.dataset.individualBalances;
-      if (individualBalances) {
-        individualBalances = individualBalances.split(',').map((b) => ethers.BigNumber.from(b));
-      } else {
-        // If individual balances are not stored, fetch them
-        individualBalances = await Promise.all(
-          _tokenIds.map(async (tokenId) => {
-            const gotchi = ownedAavegotchis.find((g) => g.tokenId.eq(tokenId));
-            const escrowWallet = gotchi.escrow;
-            const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
-            const balance = await tokenContract.balanceOf(escrowWallet);
-            return balance;
-          })
-        );
-      }
-
       const totalAvailableBalance = individualBalances.reduce((acc, balance) => acc.add(balance), ethers.BigNumber.from(0));
 
       if (totalTransferAmount.gt(totalAvailableBalance)) {
-        throw new Error('The total amount exceeds the total available balance across all Aavegotchis.');
+        throw new Error('The total amount exceeds the total available balance across your Aavegotchis.');
       }
 
       if (totalTransferAmount.eq(totalAvailableBalance)) {
@@ -933,16 +935,31 @@ async function updateMaxButton(form) {
       const balancePromises = ownedAavegotchis.map(async (gotchi) => {
         const escrowWallet = gotchi.escrow;
         const balance = await tokenContract.balanceOf(escrowWallet);
-        return balance;
+        return { gotchi, balance };
       });
 
-      const balances = await Promise.all(balancePromises);
+      const balancesResult = await Promise.all(balancePromises);
+
+      // Filter out Aavegotchis with zero balance
+      const filteredData = balancesResult.filter(({ balance }) => !balance.isZero());
+
+      if (filteredData.length === 0) {
+        maxButton.disabled = true;
+        maxButton.innerText = 'Max';
+        alert('None of your Aavegotchis hold the selected token.');
+        return;
+      }
+
+      const balances = filteredData.map(({ balance }) => balance);
+      const tokenIds = filteredData.map(({ gotchi }) => gotchi.tokenId);
+
       balances.forEach((balance) => {
         totalBalance = totalBalance.add(balance);
       });
 
       // Store individual balances for batch transfer
       maxButton.dataset.individualBalances = balances.map((b) => b.toString()).join(',');
+      maxButton.dataset.tokenIds = tokenIds.map((id) => id.toString()).join(',');
       maxButton.dataset.maxValue = totalBalance.toString();
 
       // Do not set amountInput.value here
