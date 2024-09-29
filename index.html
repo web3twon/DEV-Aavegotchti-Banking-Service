@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Viewport meta tag for mobile responsiveness -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gotchi Banking Services</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>Gotchi Banking Services</h1>
+    <p>Contract: 
+      <a id="contract-address-link" href="https://polygonscan.com/address/0x86935F11C86623deC8a25696E1C19a8659CbF95d" target="_blank" rel="noopener noreferrer" class="address-link" title="0x86935F11C86623deC8a25696E1C19a8659CbF95d">
+        0x8693...F95d
+      </a>
+    </p>
+    <p>Network: <span id="network-name">Not Connected</span></p>
+    <div id="aavegotchi-info" class="aavegotchi-info">
+      <!-- Aavegotchi details will be populated here -->
+    </div>
+  </div>
+  <button id="connect-wallet" class="button">Connect Wallet</button>
+</header>
+
+<main>
+  <div id="wallet-info" class="wallet-info"></div>
+  <div class="form-wrapper">
+    <div id="method-forms">
+      <!-- Method forms will be dynamically inserted here -->
+    </div>
+  </div>
+</main>
+
+<!-- Moved the Diamond Standard link to the footer -->
+<footer>
+  <nav>
+    <a href="https://eips.ethereum.org/EIPS/eip-2535" target="_blank">Diamond Standard (EIP-2535)</a>
+  </nav>
+</footer>
+
+<!-- Load Ethers.js UMD build via CDN -->
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
