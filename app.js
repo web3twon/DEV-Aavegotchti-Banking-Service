@@ -653,16 +653,23 @@ async function handleFormSubmit(event) {
 
       const totalTransferAmount = ethers.utils.parseUnits(transferAmountValue, 18);
 
-      // Get individual balances
-      const individualBalances = await Promise.all(
-        _tokenIds.map(async (tokenId) => {
-          const gotchi = ownedAavegotchis.find((g) => g.tokenId.eq(tokenId));
-          const escrowWallet = gotchi.escrow;
-          const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
-          const balance = await tokenContract.balanceOf(escrowWallet);
-          return balance;
-        })
-      );
+      // Retrieve individual balances stored during Max button click
+      const maxButton = form.querySelector('.max-button');
+      let individualBalances = maxButton.dataset.individualBalances;
+      if (individualBalances) {
+        individualBalances = individualBalances.split(',').map((b) => ethers.BigNumber.from(b));
+      } else {
+        // If individual balances are not stored, fetch them
+        individualBalances = await Promise.all(
+          _tokenIds.map(async (tokenId) => {
+            const gotchi = ownedAavegotchis.find((g) => g.tokenId.eq(tokenId));
+            const escrowWallet = gotchi.escrow;
+            const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
+            const balance = await tokenContract.balanceOf(escrowWallet);
+            return balance;
+          })
+        );
+      }
 
       const totalAvailableBalance = individualBalances.reduce((acc, balance) => acc.add(balance), ethers.BigNumber.from(0));
 
@@ -670,21 +677,15 @@ async function handleFormSubmit(event) {
         throw new Error('The total amount exceeds the total available balance across all Aavegotchis.');
       }
 
-      // Distribute equally
-      const numAavegotchis = _tokenIds.length;
-      const amountPerAavegotchi = totalTransferAmount.div(numAavegotchis);
-      const remainder = totalTransferAmount.mod(numAavegotchis);
-
-      for (let i = 0; i < numAavegotchis; i++) {
-        let amount = amountPerAavegotchi;
-        if (i === numAavegotchis - 1) {
-          amount = amount.add(remainder); // Add remainder to last
-        }
-        // Ensure amount does not exceed individual balance
-        if (amount.gt(individualBalances[i])) {
-          amount = individualBalances[i];
-        }
-        _transferAmounts.push(amount);
+      if (totalTransferAmount.eq(totalAvailableBalance)) {
+        // Use individual balances as transfer amounts
+        _transferAmounts = individualBalances;
+      } else {
+        // Distribute the totalTransferAmount proportionally based on individual balances
+        const totalBalances = individualBalances.reduce((acc, balance) => acc.add(balance), ethers.BigNumber.from(0));
+        _transferAmounts = individualBalances.map((balance) =>
+          balance.mul(totalTransferAmount).div(totalBalances)
+        );
       }
 
       args.push(_transferAmounts);
