@@ -1,5 +1,9 @@
 // app.js
 
+// Ensure ethers.js version 6.13.3 is used
+// Include in your HTML:
+// <script src="https://cdn.ethers.io/lib/ethers-6.13.3.umd.min.js" type="application/javascript"></script>
+
 // Contract Information
 const contractAddress = '0x86935F11C86623deC8a25696E1C19a8659CbF95d';
 
@@ -175,8 +179,8 @@ async function connectWallet() {
 
   try {
     await window.ethereum.request({ method: 'eth_requestAccounts' });
-    provider = new ethers.providers.Web3Provider(window.ethereum);
-    signer = provider.getSigner();
+    provider = new ethers.BrowserProvider(window.ethereum);
+    signer = await provider.getSigner();
     const address = await signer.getAddress();
     userAddress = address;
 
@@ -203,6 +207,29 @@ async function connectWallet() {
     }
     networkNameDisplay.innerText = `${networkName}`;
 
+    // Enforce network selection
+    if (network.chainId !== 137) { // Assuming Polygon Mainnet
+      alert('Please switch to the Polygon network in MetaMask.');
+      // Optionally, trigger a network switch using MetaMask's API
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0x89' }], // '0x89' is 137 in hexadecimal
+        });
+        // Reload the page after network switch
+        window.location.reload();
+        return;
+      } catch (switchError) {
+        if (switchError.code === 4902) {
+          // The network is not added to MetaMask
+          alert('The Polygon network is not available in your MetaMask. Please add it manually.');
+        } else {
+          alert('Failed to switch to the Polygon network. Please switch manually in MetaMask.');
+        }
+        return;
+      }
+    }
+
     contract = new ethers.Contract(contractAddress, combinedABI, signer);
     ghstContract = new ethers.Contract(ghstContractAddress, ghstABI, provider);
 
@@ -210,6 +237,7 @@ async function connectWallet() {
 
     await fetchAndDisplayAavegotchis(address);
     generateMethodForms(); // Generate forms after fetching Aavegotchis
+
     window.ethereum.on('accountsChanged', handleAccountsChanged);
     window.ethereum.on('chainChanged', handleChainChanged);
     initializeCopyButtons();
@@ -229,6 +257,7 @@ function handleAccountsChanged(accounts) {
     ghstContract = null;
     methodFormsContainer.innerHTML = '';
     aavegotchiInfoContainer.innerHTML = '';
+    cleanupEventListeners();
   } else {
     window.location.reload();
   }
@@ -237,6 +266,14 @@ function handleAccountsChanged(accounts) {
 // Handle Network Changes
 function handleChainChanged(_chainId) {
   window.location.reload();
+}
+
+// Clean up event listeners
+function cleanupEventListeners() {
+  if (window.ethereum && handleAccountsChanged && handleChainChanged) {
+    window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
+    window.ethereum.removeListener('chainChanged', handleChainChanged);
+  }
 }
 
 // Function to Capitalize First Letter
@@ -600,6 +637,10 @@ async function handleFormSubmit(event) {
   const formData = new FormData(form);
 
   const args = [];
+  const submitButton = form.querySelector('.submit-button');
+  submitButton.disabled = true;
+  submitButton.innerText = 'Submitting...';
+
   try {
     const tokenIdValue = formData.get('_tokenId');
     const erc20ContractValue = formData.get('_erc20Contract');
@@ -607,7 +648,7 @@ async function handleFormSubmit(event) {
 
     if (erc20ContractValue === 'custom') {
       const customAddress = formData.get('custom-erc20-address')?.trim();
-      if (!customAddress || !ethers.utils.isAddress(customAddress)) {
+      if (!customAddress || !ethers.isAddress(customAddress)) {
         throw new Error('Please provide a valid custom ERC20 contract address.');
       }
       erc20ContractAddress = customAddress;
@@ -623,7 +664,7 @@ async function handleFormSubmit(event) {
       method = facetMethods[methodName];
 
       // Prepare arguments
-      let _tokenIds = ownedAavegotchis.map((gotchi) => ethers.BigNumber.from(gotchi.tokenId));
+      let _tokenIds = ownedAavegotchis.map((gotchi) => ethers.BigInt(gotchi.tokenId));
 
       // Validate ownership
       if (_tokenIds.length === 0) {
@@ -633,14 +674,14 @@ async function handleFormSubmit(event) {
       // Filter Aavegotchis with positive balance of the selected token
       const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
       const balancePromises = _tokenIds.map(async (tokenId) => {
-        const gotchi = ownedAavegotchis.find((g) => g.tokenId.eq(tokenId));
+        const gotchi = ownedAavegotchis.find((g) => ethers.BigInt(g.tokenId) === tokenId);
         const escrowWallet = gotchi.escrow;
         const balance = await tokenContract.balanceOf(escrowWallet);
         return { tokenId, balance };
       });
 
       const balancesResult = await Promise.all(balancePromises);
-      const filteredData = balancesResult.filter(({ balance }) => !balance.isZero());
+      const filteredData = balancesResult.filter(({ balance }) => balance > 0n);
 
       if (filteredData.length === 0) {
         throw new Error('None of your Aavegotchis hold the selected token.');
@@ -671,22 +712,23 @@ async function handleFormSubmit(event) {
         throw new Error('Invalid number for amount');
       }
 
-      const totalTransferAmount = ethers.utils.parseUnits(transferAmountValue, 18);
+      const decimals = await tokenContract.decimals();
+      const totalTransferAmount = ethers.parseUnits(transferAmountValue, decimals);
 
-      const totalAvailableBalance = individualBalances.reduce((acc, balance) => acc.add(balance), ethers.BigNumber.from(0));
+      const totalAvailableBalance = individualBalances.reduce((acc, balance) => acc + balance, 0n);
 
-      if (totalTransferAmount.gt(totalAvailableBalance)) {
+      if (totalTransferAmount > totalAvailableBalance) {
         throw new Error('The total amount exceeds the total available balance across your Aavegotchis.');
       }
 
-      if (totalTransferAmount.eq(totalAvailableBalance)) {
+      if (totalTransferAmount === totalAvailableBalance) {
         // Use individual balances as transfer amounts
         _transferAmounts = individualBalances;
       } else {
         // Distribute the totalTransferAmount proportionally based on individual balances
-        const totalBalances = individualBalances.reduce((acc, balance) => acc.add(balance), ethers.BigNumber.from(0));
+        const totalBalances = individualBalances.reduce((acc, balance) => acc + balance, 0n);
         _transferAmounts = individualBalances.map((balance) =>
-          balance.mul(totalTransferAmount).div(totalBalances)
+          (balance * totalTransferAmount) / totalBalances
         );
       }
 
@@ -694,7 +736,7 @@ async function handleFormSubmit(event) {
 
     } else {
       // Single Aavegotchi
-      const _tokenId = ethers.BigNumber.from(tokenIdValue);
+      const _tokenId = ethers.BigInt(tokenIdValue);
       args.push(_tokenId);
 
       // Validate ownership
@@ -714,7 +756,9 @@ async function handleFormSubmit(event) {
         throw new Error('Invalid number for amount');
       }
 
-      const transferAmount = ethers.utils.parseUnits(transferAmountValue, 18);
+      const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
+      const decimals = await tokenContract.decimals();
+      const transferAmount = ethers.parseUnits(transferAmountValue, decimals);
 
       args.push(transferAmount);
     }
@@ -725,7 +769,10 @@ async function handleFormSubmit(event) {
     alert('Transaction confirmed!');
   } catch (error) {
     console.error(error);
-    alert(`Error: ${error.data?.message || error.message}`);
+    alert(`Error: ${error.info?.error?.message || error.message}`);
+  } finally {
+    submitButton.disabled = false;
+    submitButton.innerText = 'Submit';
   }
 }
 
@@ -844,7 +891,7 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
 
       // GHST Balance Cell
       const ghstBalanceRaw = balances[index];
-      const ghstBalance = ethers.utils.formatUnits(ghstBalanceRaw, ghstDecimals);
+      const ghstBalance = ethers.formatUnits(ghstBalanceRaw, ghstDecimals);
       const ghstBalanceCell = document.createElement('td');
       ghstBalanceCell.setAttribute('data-label', 'GHST Balance');
       ghstBalanceCell.innerText = ghstBalance;
@@ -914,7 +961,7 @@ async function updateMaxButton(form) {
     erc20Address = customErc20Input ? customErc20Input.value : null;
   }
 
-  if (!erc20Address || !ethers.utils.isAddress(erc20Address)) {
+  if (!erc20Address || !ethers.isAddress(erc20Address)) {
     return;
   }
 
@@ -928,7 +975,7 @@ async function updateMaxButton(form) {
   maxButton.innerText = 'Loading...';
 
   try {
-    let totalBalance = ethers.BigNumber.from(0);
+    let totalBalance = 0n;
     const tokenContract = new ethers.Contract(erc20Address, ghstABI, provider);
 
     if (tokenIdValue === 'all') {
@@ -941,7 +988,7 @@ async function updateMaxButton(form) {
       const balancesResult = await Promise.all(balancePromises);
 
       // Filter out Aavegotchis with zero balance
-      const filteredData = balancesResult.filter(({ balance }) => !balance.isZero());
+      const filteredData = balancesResult.filter(({ balance }) => balance > 0n);
 
       if (filteredData.length === 0) {
         maxButton.disabled = true;
@@ -954,7 +1001,7 @@ async function updateMaxButton(form) {
       const tokenIds = filteredData.map(({ gotchi }) => gotchi.tokenId);
 
       balances.forEach((balance) => {
-        totalBalance = totalBalance.add(balance);
+        totalBalance += balance;
       });
 
       // Store individual balances for batch transfer
@@ -987,8 +1034,19 @@ async function handleMaxButtonClick(form) {
   const maxValue = maxButton.dataset.maxValue;
 
   if (maxValue) {
-    const decimals = 18; // Assuming 18 decimals for tokens
-    const formattedValue = ethers.utils.formatUnits(maxValue, decimals);
+    const tokenIdSelect = form.querySelector('select[name="_tokenId"]');
+    const erc20ContractSelect = form.querySelector('select[name="_erc20Contract"]');
+    const customErc20Input = form.querySelector('input[name="custom-erc20-address"]');
+    let erc20Address = erc20ContractSelect ? erc20ContractSelect.value : null;
+
+    if (erc20Address === 'custom') {
+      erc20Address = customErc20Input ? customErc20Input.value : null;
+    }
+
+    const tokenContract = new ethers.Contract(erc20Address, ghstABI, provider);
+    const decimals = await tokenContract.decimals();
+
+    const formattedValue = ethers.formatUnits(maxValue, decimals);
     amountInput.value = formattedValue;
   }
 }
