@@ -1,8 +1,8 @@
 // app.js
 
-// Ensure ethers.js version 6.13.3 is used
-// Include in your HTML:
-// <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js" type="application/javascript"></script>
+// Ensure ethers.js version 6.13.2 is used
+// Included in your HTML with SRI:
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js" integrity="sha384-gpR0Q6Hx/O+uevlbpbANbS0LWjbejPV1sqD/8w422l/fW8whGY0EPmKw3uG7ACYP" crossorigin="anonymous"></script>
 
 // Contract Information
 const contractAddress = '0x86935F11C86623deC8a25696E1C19a8659CbF95d';
