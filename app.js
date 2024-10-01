@@ -2,7 +2,7 @@
 
 // Ensure ethers.js version 6.13.3 is used
 // Include in your HTML:
-// <script src="https://cdn.ethers.io/lib/ethers-6.13.3.umd.min.js" type="application/javascript"></script>
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js" type="application/javascript"></script>
 
 // Contract Information
 const contractAddress = '0x86935F11C86623deC8a25696E1C19a8659CbF95d';
