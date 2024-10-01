@@ -196,11 +196,13 @@ async function connectWallet() {
 
     const network = await provider.getNetwork();
     let networkName = 'Unknown';
-    if (network.chainId === 137) {
+
+    // Use BigInt for chainId comparisons
+    if (network.chainId === 137n) {
       networkName = 'Polygon';
-    } else if (network.chainId === 1) {
+    } else if (network.chainId === 1n) {
       networkName = 'Ethereum';
-    } else if (network.chainId === 80001) {
+    } else if (network.chainId === 80001n) {
       networkName = 'Mumbai';
     } else {
       networkName = capitalizeFirstLetter(network.name);
@@ -208,7 +210,7 @@ async function connectWallet() {
     networkNameDisplay.innerText = `${networkName}`;
 
     // Enforce network selection
-    if (network.chainId !== 137) { // Assuming Polygon Mainnet
+    if (network.chainId !== 137n) {
       alert('Please switch to the Polygon network in MetaMask.');
       // Optionally, trigger a network switch using MetaMask's API
       try {
@@ -664,7 +666,7 @@ async function handleFormSubmit(event) {
       method = facetMethods[methodName];
 
       // Prepare arguments
-      let _tokenIds = ownedAavegotchis.map((gotchi) => ethers.BigInt(gotchi.tokenId));
+      let _tokenIds = ownedAavegotchis.map((gotchi) => ethers.getBigInt(gotchi.tokenId));
 
       // Validate ownership
       if (_tokenIds.length === 0) {
@@ -674,7 +676,7 @@ async function handleFormSubmit(event) {
       // Filter Aavegotchis with positive balance of the selected token
       const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
       const balancePromises = _tokenIds.map(async (tokenId) => {
-        const gotchi = ownedAavegotchis.find((g) => ethers.BigInt(g.tokenId) === tokenId);
+        const gotchi = ownedAavegotchis.find((g) => ethers.getBigInt(g.tokenId) === tokenId);
         const escrowWallet = gotchi.escrow;
         const balance = await tokenContract.balanceOf(escrowWallet);
         return { tokenId, balance };
@@ -736,7 +738,7 @@ async function handleFormSubmit(event) {
 
     } else {
       // Single Aavegotchi
-      const _tokenId = ethers.BigInt(tokenIdValue);
+      const _tokenId = ethers.getBigInt(tokenIdValue);
       args.push(_tokenId);
 
       // Validate ownership
