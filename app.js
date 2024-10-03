@@ -375,7 +375,7 @@ function generateMethodForms() {
         ownedAavegotchis.forEach((aavegotchi) => {
           const option = document.createElement('option');
           option.value = aavegotchi.tokenId.toString();
-          option.innerText = `${aavegotchi.name} (ID: ${aavegotchi.tokenId})`;
+          option.innerText = `Aavegotchi ID ${aavegotchi.tokenId} (${aavegotchi.name})`;
           inputElement.appendChild(option);
         });
 
@@ -679,7 +679,8 @@ async function handleFormSubmit(event) {
         const gotchi = ownedAavegotchis.find((g) => ethers.getBigInt(g.tokenId) === tokenId);
         const escrowWallet = gotchi.escrow;
         const balance = await tokenContract.balanceOf(escrowWallet);
-        return { tokenId, balance };
+        const symbol = await tokenContract.symbol();
+        return { tokenId, balance, symbol, name: gotchi.name };
       });
 
       const balancesResult = await Promise.all(balancePromises);
@@ -716,7 +717,14 @@ async function handleFormSubmit(event) {
         _transferAmounts = individualBalances;
       } else {
         // Show popup for user to specify amounts per Aavegotchi
-        _transferAmounts = await getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTransferAmount, decimals, tokenContract);
+        _transferAmounts = await getUserSpecifiedAmounts(
+          filteredData.map((data) => data.tokenId),
+          filteredData.map((data) => data.balance),
+          totalTransferAmount,
+          decimals,
+          tokenContract,
+          filteredData.map((data) => data.name)
+        );
       }
 
       args.push(_tokenIds);
@@ -730,7 +738,6 @@ async function handleFormSubmit(event) {
       args.push(_recipients);
 
       args.push(_transferAmounts);
-
     } else {
       // Single Aavegotchi
       const _tokenId = ethers.getBigInt(tokenIdValue);
@@ -774,7 +781,7 @@ async function handleFormSubmit(event) {
 }
 
 // Function to Get User-Specified Amounts via Popup
-async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTransferAmount, decimals, tokenContract) {
+async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTransferAmount, decimals, tokenContract, aavegotchiNames) {
   return new Promise((resolve, reject) => {
     // Create the modal overlay
     const modalOverlay = document.createElement('div');
@@ -810,12 +817,13 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
     _tokenIds.forEach((tokenId, index) => {
       const balance = individualBalances[index];
       const balanceFormatted = ethers.formatUnits(balance, decimals);
+      const aavegotchiName = aavegotchiNames[index] || 'Unnamed';
 
       const formGroup = document.createElement('div');
       formGroup.className = 'form-group';
 
       const label = document.createElement('label');
-      label.innerText = `Aavegotchi ID ${tokenId} (Balance: ${balanceFormatted}):`;
+      label.innerText = `Aavegotchi ID ${tokenId} (${aavegotchiName}) (Balance: ${balanceFormatted}):`;
 
       const input = document.createElement('input');
       input.type = 'number';
@@ -1049,12 +1057,12 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
 
       row.appendChild(escrowCell);
 
-      // GHST Balance Cell
+      // GHST Balance Cell with Token Symbol
       const ghstBalanceRaw = balances[index];
       const ghstBalance = ethers.formatUnits(ghstBalanceRaw, ghstDecimals);
       const ghstBalanceCell = document.createElement('td');
       ghstBalanceCell.setAttribute('data-label', 'GHST Balance');
-      ghstBalanceCell.innerText = ghstBalance;
+      ghstBalanceCell.innerText = `${ghstBalance} ${ghstSymbol}`;
       row.appendChild(ghstBalanceCell);
 
       // Status Cell
@@ -1142,31 +1150,26 @@ async function updateMaxButton(form) {
       const balancePromises = ownedAavegotchis.map(async (gotchi) => {
         const escrowWallet = gotchi.escrow;
         const balance = await tokenContract.balanceOf(escrowWallet);
-        return { gotchi, balance };
+        return balance;
       });
 
-      const balancesResult = await Promise.all(balancePromises);
+      const balances = await Promise.all(balancePromises);
 
       // Filter out Aavegotchis with zero balance
-      const filteredData = balancesResult.filter(({ balance }) => balance > 0n);
+      const filteredBalances = balances.filter((balance) => balance > 0n);
 
-      if (filteredData.length === 0) {
+      if (filteredBalances.length === 0) {
         maxButton.disabled = true;
         maxButton.innerText = 'Max';
         alert('None of your Aavegotchis hold the selected token.');
         return;
       }
 
-      const balances = filteredData.map(({ balance }) => balance);
-      const tokenIds = filteredData.map(({ gotchi }) => gotchi.tokenId);
-
-      balances.forEach((balance) => {
+      filteredBalances.forEach((balance) => {
         totalBalance += balance;
       });
 
       // Store individual balances for batch transfer
-      maxButton.dataset.individualBalances = balances.map((b) => b.toString()).join(',');
-      maxButton.dataset.tokenIds = tokenIds.map((id) => id.toString()).join(',');
       maxButton.dataset.maxValue = totalBalance.toString();
 
       // Do not set amountInput.value here
