@@ -789,10 +789,17 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
     modalHeader.innerText = 'Specify Withdrawal Amounts Per Aavegotchi';
     modalContent.appendChild(modalHeader);
 
-    // Instruction text
+    // Instruction text with total amount
     const instruction = document.createElement('p');
-    instruction.innerText = `Total Amount to Withdraw: ${ethers.formatUnits(totalTransferAmount, decimals)} tokens`;
+    instruction.className = 'instruction';
+    instruction.innerText = `Specify Withdrawal Amounts Per Aavegotchi ensuring the total amount equals ${ethers.formatUnits(totalTransferAmount, decimals)} tokens`;
     modalContent.appendChild(instruction);
+
+    // Total display
+    const totalDisplay = document.createElement('div');
+    totalDisplay.className = 'total-display incorrect';
+    totalDisplay.innerText = `Total Entered: 0.0`;
+    modalContent.appendChild(totalDisplay);
 
     // Create form
     const form = document.createElement('form');
@@ -838,7 +845,7 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
 
     const submitButton = document.createElement('button');
     submitButton.type = 'submit';
-    submitButton.className = 'button';
+    submitButton.className = 'button submit-button';
     submitButton.innerText = 'Confirm';
 
     const cancelButton = document.createElement('button');
@@ -853,6 +860,37 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
 
     modalOverlay.appendChild(modalContent);
     document.body.appendChild(modalOverlay);
+
+    // Function to update total
+    const updateTotal = () => {
+      let totalEntered = 0n;
+      amountInputs.forEach((input, index) => {
+        const value = input.value.trim();
+        if (/^\d+(\.\d+)?$/.test(value)) {
+          const amount = ethers.parseUnits(value, decimals);
+          totalEntered += amount;
+        }
+      });
+
+      const formattedTotal = ethers.formatUnits(totalEntered, decimals);
+      totalDisplay.innerText = `Total Entered: ${formattedTotal}`;
+
+      if (totalEntered === totalTransferAmount) {
+        totalDisplay.classList.remove('incorrect');
+        totalDisplay.classList.add('correct');
+      } else {
+        totalDisplay.classList.remove('correct');
+        totalDisplay.classList.add('incorrect');
+      }
+    };
+
+    // Initial total calculation
+    updateTotal();
+
+    // Add event listeners to inputs for dynamic total calculation
+    amountInputs.forEach((input) => {
+      input.addEventListener('input', updateTotal);
+    });
 
     // Handle form submission
     form.addEventListener('submit', (e) => {
@@ -1005,8 +1043,7 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       const copyButton = document.createElement('button');
       copyButton.className = 'copy-button';
       copyButton.setAttribute('data-copy-target', escrowWallet);
-      copyButton.setAttribute('aria-label', 'Copy Escrow Wallet Address');
-      copyButton.setAttribute('data-tooltip', 'Click to copy');
+      copyButton.setAttribute('data-tooltip', 'Copy Escrow Wallet Address');
       copyButton.innerText = '📄';
       escrowCell.appendChild(copyButton);
 
