@@ -30,70 +30,7 @@
   </div>
   <div class="form-wrapper">
     <div id="method-forms">
-      <!-- Tab-Based Distribution Forms -->
-      <div class="tabs">
-        <button class="tab-button active" data-tab="proportional">Proportional</button>
-        <button class="tab-button" data-tab="equal">Equal</button>
-        <button class="tab-button" data-tab="user-specified">User-Specified</button>
-      </div>
-      
-      <!-- Proportional Distribution Tab Content -->
-      <div class="tab-content" id="proportional">
-        <form id="proportional-form">
-          <div class="form-group">
-            <label for="proportional-amount">Total Withdrawal Amount:</label>
-            <div class="input-wrapper">
-              <input type="text" id="proportional-amount" name="proportional-amount" class="input" placeholder="Enter total GHST to withdraw">
-              <button type="button" class="max-button">Max</button>
-            </div>
-          </div>
-          <div id="proportional-breakdown" class="breakdown-table">
-            <!-- Withdrawal breakdown will be displayed here -->
-          </div>
-          <button type="submit" class="button submit-button">Withdraw Proportionally</button>
-        </form>
-      </div>
-      
-      <!-- Equal Distribution Tab Content -->
-      <div class="tab-content hidden" id="equal">
-        <form id="equal-form">
-          <div class="form-group">
-            <label for="equal-amount">Total Withdrawal Amount:</label>
-            <div class="input-wrapper">
-              <input type="text" id="equal-amount" name="equal-amount" class="input" placeholder="Enter total GHST to withdraw">
-              <button type="button" class="max-button">Max</button>
-            </div>
-          </div>
-          <div id="equal-breakdown" class="breakdown-table">
-            <!-- Withdrawal breakdown will be displayed here -->
-          </div>
-          <button type="submit" class="button submit-button">Withdraw Equally</button>
-        </form>
-      </div>
-      
-      <!-- User-Specified Distribution Tab Content -->
-      <div class="tab-content hidden" id="user-specified">
-        <form id="user-specified-form">
-          <div class="form-group">
-            <label for="user-total-amount">Total Withdrawal Amount:</label>
-            <div class="input-wrapper">
-              <input type="text" id="user-total-amount" name="user-total-amount" class="input" placeholder="Enter total GHST to withdraw">
-              <button type="button" class="max-button">Max</button>
-            </div>
-          </div>
-          
-          <div class="form-group">
-            <label>Allocate to Each Aavegotchi:</label>
-            <div id="user-allocation" class="allocation">
-              <!-- Allocation fields will be dynamically generated here -->
-            </div>
-          </div>
-          
-          <div id="user-validation" class="validation-message"></div>
-          
-          <button type="submit" class="button submit-button">Withdraw as Specified</button>
-        </form>
-      </div>
+      <!-- Method forms will be dynamically inserted here -->
     </div>
   </div>
 </main>

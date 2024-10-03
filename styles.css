@@ -63,7 +63,6 @@ header {
   color: var(--color-light-pink);
 }
 
-/* Header Left Section */
 .header-left {
   max-width: 70%;
 }
@@ -89,7 +88,6 @@ header p {
   max-width: 150px;
   display: inline-block;
   vertical-align: middle;
-  position: relative;
 }
 
 .address-link:hover {
@@ -108,7 +106,6 @@ header p {
   font-size: 16px;
 }
 
-/* Wallet Info Styles */
 .wallet-info {
   margin-top: 30px;
 }
@@ -446,89 +443,6 @@ a:hover {
 
 .form-header:hover {
   background-color: rgba(255, 255, 255, 0.1);
-}
-
-/* Tabs Styles */
-.tabs {
-  display: flex;
-  margin-bottom: 20px;
-  border-bottom: 2px solid var(--color-vivid-purple);
-}
-
-.tab-button {
-  flex: 1;
-  padding: 10px;
-  background-color: var(--color-soft-purple);
-  border: 1px solid var(--color-vivid-purple);
-  border-bottom: none;
-  cursor: pointer;
-  transition: background-color var(--transition-speed), color var(--transition-speed);
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.tab-button.active {
-  background-color: var(--color-vivid-purple);
-  color: var(--color-white);
-}
-
-.tab-button:not(:last-child) {
-  border-right: none;
-}
-
-.tab-content.hidden {
-  display: none;
-}
-
-.breakdown-table {
-  margin-bottom: 20px;
-}
-
-.breakdown-table table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.breakdown-table th,
-.breakdown-table td {
-  padding: 10px;
-  border: 1px solid var(--color-border-gray);
-  text-align: left;
-}
-
-.breakdown-table th {
-  background-color: var(--color-bright-blue);
-  color: var(--color-white);
-}
-
-.allocation {
-  display: flex;
-  flex-direction: column;
-}
-
-.allocation-item {
-  display: flex;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.allocation-item span {
-  flex: 1;
-  color: var(--color-white);
-}
-
-.allocation-item input {
-  flex: 2;
-  padding: 8px;
-  border-radius: 4px;
-  border: 1px solid var(--color-border-gray);
-  background-color: var(--color-dark-purple);
-  color: var(--color-white);
-}
-
-.validation-message {
-  color: #ff4d4f;
-  margin-bottom: 15px;
 }
 
 /* Responsive Design */
