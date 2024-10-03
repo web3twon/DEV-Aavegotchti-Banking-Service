@@ -186,14 +186,14 @@ async function connectWallet() {
 
     const shortAddress = `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-    walletInfo.innerHTML = `
-      <p>Connected Wallet Address: 
+    walletInfo.innerHTML = 
+      `<p>Connected Wallet Address: 
         <a href="https://polygonscan.com/address/${address}" target="_blank" rel="noopener noreferrer" class="address-link" title="${address}">
           ${shortAddress}
         </a>
       </p>
-    `;
-
+      `;
+  
     const network = await provider.getNetwork();
     let networkName = 'Unknown';
 
@@ -283,7 +283,7 @@ function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
-// Function to Generate Method Forms
+// Function to Generate Method Forms (Tab-Based)
 function generateMethodForms() {
   methodFormsContainer.innerHTML = '';
   if (!contract) {
@@ -291,494 +291,325 @@ function generateMethodForms() {
     return;
   }
 
-  const selectedFacet = 'EscrowFacet';
-  const facetMethods = getFacetMethods(selectedFacet);
+  // The forms are already defined in the HTML via tabs, so no need to generate them here
+  // However, we need to initialize the forms based on the active tab
 
-  if (!facetMethods) {
-    methodFormsContainer.innerHTML = '<p>No methods found for the selected facet.</p>';
+  // Initialize forms for each tab
+  initializeProportionalForm();
+  initializeEqualForm();
+  initializeUserSpecifiedForm();
+}
+
+// Function to Initialize Proportional Form
+function initializeProportionalForm() {
+  const proportionalForm = document.getElementById('proportional-form');
+  const proportionalBreakdown = document.getElementById('proportional-breakdown');
+  const proportionalAmountInput = document.getElementById('proportional-amount');
+  const proportionalMaxButton = proportionalForm.querySelector('.max-button');
+
+  proportionalForm.addEventListener('submit', handleProportionalWithdraw);
+  proportionalMaxButton.addEventListener('click', () => handleMaxButtonClick(proportionalForm, 'proportional'));
+
+  proportionalAmountInput.addEventListener('input', () => updateProportionalBreakdown(proportionalForm, proportionalBreakdown));
+}
+
+// Function to Initialize Equal Form
+function initializeEqualForm() {
+  const equalForm = document.getElementById('equal-form');
+  const equalBreakdown = document.getElementById('equal-breakdown');
+  const equalAmountInput = document.getElementById('equal-amount');
+  const equalMaxButton = equalForm.querySelector('.max-button');
+
+  equalForm.addEventListener('submit', handleEqualWithdraw);
+  equalMaxButton.addEventListener('click', () => handleMaxButtonClick(equalForm, 'equal'));
+
+  equalAmountInput.addEventListener('input', () => updateEqualBreakdown(equalForm, equalBreakdown));
+}
+
+// Function to Initialize User-Specified Form
+function initializeUserSpecifiedForm() {
+  const userForm = document.getElementById('user-specified-form');
+  const userTotalAmountInput = document.getElementById('user-total-amount');
+  const userMaxButton = userForm.querySelector('.max-button');
+  const userAllocationContainer = document.getElementById('user-allocation');
+  const userValidationMessage = document.getElementById('user-validation');
+
+  // Dynamically generate allocation fields based on owned Aavegotchis
+  ownedAavegotchis.forEach((gotchi) => {
+    const allocationItem = document.createElement('div');
+    allocationItem.className = 'allocation-item';
+
+    const label = document.createElement('span');
+    label.innerText = `${gotchi.name} (ID: ${gotchi.tokenId}):`;
+    allocationItem.appendChild(label);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.name = `allocation-${gotchi.tokenId}`;
+    input.className = 'input';
+    input.placeholder = 'Enter GHST';
+    input.addEventListener('input', validateUserSpecifiedForm);
+    allocationItem.appendChild(input);
+
+    userAllocationContainer.appendChild(allocationItem);
+  });
+
+  userForm.addEventListener('submit', handleUserSpecifiedWithdraw);
+  userMaxButton.addEventListener('click', () => handleMaxButtonClick(userForm, 'user-specified'));
+  userTotalAmountInput.addEventListener('input', validateUserSpecifiedForm);
+}
+
+// Function to Validate User-Specified Form
+function validateUserSpecifiedForm() {
+  const userForm = document.getElementById('user-specified-form');
+  const userTotalAmountInput = document.getElementById('user-total-amount');
+  const userAllocationInputs = userForm.querySelectorAll('input[name^="allocation-"]');
+  const userValidationMessage = document.getElementById('user-validation');
+
+  let totalDesired = 0;
+  let totalAllocated = 0;
+  let valid = true;
+
+  // Parse total desired amount
+  if (userTotalAmountInput.value.trim() !== '') {
+    if (!/^\d+(\.\d+)?$/.test(userTotalAmountInput.value.trim())) {
+      valid = false;
+      userValidationMessage.innerText = 'Invalid number for total withdrawal amount.';
+      return;
+    }
+    totalDesired = parseFloat(userTotalAmountInput.value.trim());
+  }
+
+  // Parse allocated amounts
+  userAllocationInputs.forEach((input) => {
+    if (input.value.trim() !== '') {
+      if (!/^\d+(\.\d+)?$/.test(input.value.trim())) {
+        valid = false;
+        userValidationMessage.innerText = 'Invalid number in one of the allocations.';
+        return;
+      }
+      totalAllocated += parseFloat(input.value.trim());
+    }
+  });
+
+  if (valid) {
+    if (totalDesired === 0) {
+      userValidationMessage.innerText = '';
+      return;
+    }
+    if (totalAllocated !== totalDesired) {
+      valid = false;
+      userValidationMessage.innerText = `Total allocated (${totalAllocated} GHST) does not match desired amount (${totalDesired} GHST).`;
+    } else {
+      userValidationMessage.innerText = '';
+    }
+  }
+}
+
+// Function to Handle Proportional Withdraw
+async function handleProportionalWithdraw(event) {
+  event.preventDefault();
+  const form = event.target;
+  const amountInput = form.querySelector('#proportional-amount');
+  const breakdownContainer = document.getElementById('proportional-breakdown');
+  const submitButton = form.querySelector('.submit-button');
+
+  let transferAmountValue = amountInput.value.trim();
+
+  if (transferAmountValue === '') {
+    alert('Please enter an amount or click Max.');
     return;
   }
 
-  const mainMethodNames = ['transferEscrow'];
-  const extraMethodNames = ['batchTransferEscrow', 'batchDepositERC20', 'batchDepositGHST', 'depositERC20'];
-
-  mainMethodNames.forEach((methodName) => {
-    const method = facetMethods[methodName];
-    const formContainer = document.createElement('div');
-    formContainer.className = 'form-container';
-
-    const formHeader = document.createElement('div');
-    formHeader.className = 'form-header';
-
-    const formTitle = document.createElement('h3');
-    formTitle.innerText = 'TransferEscrow (Withdraw)';
-    formHeader.appendChild(formTitle);
-    formContainer.appendChild(formHeader);
-
-    const form = document.createElement('form');
-    form.setAttribute('data-method', methodName);
-    form.addEventListener('submit', handleFormSubmit);
-
-    // Include _tokenId in the inputs
-    method.inputs.forEach((input) => {
-      if (methodName === 'transferEscrow' && input.name === '_recipient') {
-        return;
-      }
-
-      const formGroup = document.createElement('div');
-      formGroup.className = 'form-group';
-
-      const label = document.createElement('label');
-      label.setAttribute('for', input.name);
-
-      if (methodName === 'transferEscrow') {
-        if (input.name === '_tokenId') {
-          label.innerText = 'Select Aavegotchi:';
-        } else if (input.name === '_erc20Contract') {
-          label.innerText = 'ERC20 Contract Address:';
-        } else if (input.name === '_transferAmount') {
-          label.innerText = 'Withdraw Amount:';
-
-          // Create Max button and append to label
-          const maxButton = document.createElement('button');
-          maxButton.type = 'button';
-          maxButton.className = 'max-button';
-          maxButton.innerText = 'Max';
-          maxButton.addEventListener('click', async () => {
-            await handleMaxButtonClick(form);
-          });
-          label.appendChild(maxButton);
-        } else {
-          label.innerText = `${input.name} (${input.type}):`;
-        }
-      } else {
-        label.innerText = `${input.name} (${input.type}):`;
-      }
-
-      formGroup.appendChild(label);
-
-      let inputElement;
-      if (input.name === '_tokenId') {
-        // Create a dropdown for owned Aavegotchis
-        inputElement = document.createElement('select');
-        inputElement.className = 'select';
-        inputElement.id = input.name;
-        inputElement.name = input.name;
-
-        if (ownedAavegotchis.length > 1) {
-          const allOption = document.createElement('option');
-          allOption.value = 'all';
-          allOption.innerText = 'All Owned Aavegotchis';
-          inputElement.appendChild(allOption);
-        }
-
-        ownedAavegotchis.forEach((aavegotchi) => {
-          const option = document.createElement('option');
-          option.value = aavegotchi.tokenId.toString();
-          option.innerText = `${aavegotchi.name} (ID: ${aavegotchi.tokenId})`;
-          inputElement.appendChild(option);
-        });
-
-        if (ownedAavegotchis.length === 0) {
-          const option = document.createElement('option');
-          option.value = '';
-          option.innerText = 'No owned Aavegotchis available';
-          inputElement.appendChild(option);
-          inputElement.disabled = true;
-        }
-
-        formGroup.appendChild(inputElement);
-
-        // Add event listener to update Max button when selection changes
-        inputElement.addEventListener('change', () => updateMaxButton(form));
-      } else if (methodName === 'transferEscrow' && input.name === '_erc20Contract') {
-        inputElement = document.createElement('select');
-        inputElement.className = 'select';
-        inputElement.id = input.name;
-        inputElement.name = input.name;
-
-        predefinedTokens.forEach((token) => {
-          const option = document.createElement('option');
-          option.value = token.address;
-          option.innerText = token.name;
-          inputElement.appendChild(option);
-        });
-
-        const customOption = document.createElement('option');
-        customOption.value = 'custom';
-        customOption.innerText = 'Add Your Own Token';
-        inputElement.appendChild(customOption);
-
-        formGroup.appendChild(inputElement);
-
-        const customInput = document.createElement('input');
-        customInput.type = 'text';
-        customInput.className = 'input';
-        customInput.id = 'custom-erc20-address';
-        customInput.name = 'custom-erc20-address';
-        customInput.placeholder = '0x...';
-        customInput.style.display = 'none';
-        formGroup.appendChild(customInput);
-
-        inputElement.addEventListener('change', async (e) => {
-          customInput.style.display = e.target.value === 'custom' ? 'block' : 'none';
-          await updateMaxButton(form);
-        });
-      } else if (input.name === '_transferAmount') {
-        inputElement = document.createElement('input');
-        inputElement.type = 'text';
-        inputElement.className = 'input';
-        inputElement.id = input.name;
-        inputElement.name = input.name;
-        formGroup.appendChild(inputElement);
-      } else {
-        if (input.type.endsWith('[]')) {
-          inputElement = document.createElement('textarea');
-          inputElement.className = 'textarea';
-          inputElement.placeholder = 'Enter comma-separated values';
-        } else {
-          inputElement = document.createElement('input');
-          inputElement.type = 'text';
-          inputElement.className = 'input';
-          if (input.type.startsWith('address')) {
-            inputElement.placeholder = '0x...';
-          }
-        }
-
-        inputElement.id = input.name;
-        inputElement.name = input.name;
-        formGroup.appendChild(inputElement);
-      }
-
-      form.appendChild(formGroup);
-    });
-
-    const submitButton = document.createElement('button');
-    submitButton.type = 'submit';
-    submitButton.className = 'button submit-button';
-    submitButton.innerText = 'Submit';
-    form.appendChild(submitButton);
-
-    formContainer.appendChild(form);
-    methodFormsContainer.appendChild(formContainer);
-
-    // Add event listeners for updating Max button when selections change
-    form.addEventListener('change', () => updateMaxButton(form));
-
-    // Call updateMaxButton to initialize the Max button
-    updateMaxButton(form);
-  });
-
-  // Include code for extra tools
-  generateExtraTools(facetMethods, extraMethodNames);
-}
-
-// Function to Generate Extra Tools
-function generateExtraTools(facetMethods, extraMethodNames) {
-  if (extraMethodNames.length > 0) {
-    const extraToolsContainer = document.createElement('div');
-    extraToolsContainer.className = 'form-container';
-
-    const extraToolsHeader = document.createElement('div');
-    extraToolsHeader.className = 'form-header';
-    extraToolsHeader.style.cursor = 'pointer';
-
-    const extraToolsTitle = document.createElement('h3');
-    extraToolsTitle.innerText = 'Extra Tools';
-    extraToolsHeader.appendChild(extraToolsTitle);
-
-    const toggleIcon = document.createElement('span');
-    toggleIcon.className = 'toggle-icon collapsed';
-    toggleIcon.innerHTML = '&#9660;';
-    extraToolsHeader.appendChild(toggleIcon);
-
-    extraToolsContainer.appendChild(extraToolsHeader);
-
-    const collapsibleContent = document.createElement('div');
-    collapsibleContent.className = 'collapsible-content';
-
-    extraMethodNames.forEach((methodName) => {
-      const method = facetMethods[methodName];
-      const formContainer = document.createElement('div');
-      formContainer.className = 'form-container-inner';
-
-      const formHeader = document.createElement('div');
-      formHeader.className = 'form-header';
-
-      const formTitle = document.createElement('h3');
-      formTitle.innerText = methodName;
-      formHeader.appendChild(formTitle);
-
-      const formToggleIcon = document.createElement('span');
-      formToggleIcon.className = 'toggle-icon collapsed';
-      formToggleIcon.innerHTML = '&#9660;';
-      formHeader.appendChild(formToggleIcon);
-
-      formContainer.appendChild(formHeader);
-
-      const formCollapsibleContent = document.createElement('div');
-      formCollapsibleContent.className = 'collapsible-content';
-
-      const form = document.createElement('form');
-      form.setAttribute('data-method', methodName);
-      form.addEventListener('submit', handleFormSubmit);
-
-      method.inputs.forEach((input) => {
-        const formGroup = document.createElement('div');
-        formGroup.className = 'form-group';
-
-        const label = document.createElement('label');
-        label.setAttribute('for', input.name);
-        label.innerText = `${input.name} (${input.type}):`;
-
-        formGroup.appendChild(label);
-
-        let inputElement;
-        if (input.type.endsWith('[]')) {
-          inputElement = document.createElement('textarea');
-          inputElement.className = 'textarea';
-          inputElement.placeholder = 'Enter comma-separated values';
-        } else {
-          inputElement = document.createElement('input');
-          inputElement.type = 'text';
-          inputElement.className = 'input';
-          if (input.type.startsWith('address')) {
-            inputElement.placeholder = '0x...';
-          }
-        }
-
-        inputElement.id = input.name;
-        inputElement.name = input.name;
-        formGroup.appendChild(inputElement);
-        form.appendChild(formGroup);
-      });
-
-      const submitButton = document.createElement('button');
-      submitButton.type = 'submit';
-      submitButton.className = 'button submit-button';
-      submitButton.innerText = 'Submit';
-      form.appendChild(submitButton);
-
-      formCollapsibleContent.appendChild(form);
-      formContainer.appendChild(formCollapsibleContent);
-      collapsibleContent.appendChild(formContainer);
-
-      toggleCollapse(formCollapsibleContent, formToggleIcon, false);
-
-      formHeader.addEventListener('click', () => {
-        const isExpanded = formCollapsibleContent.classList.contains('expanded');
-        toggleCollapse(formCollapsibleContent, formToggleIcon, !isExpanded);
-      });
-    });
-
-    extraToolsContainer.appendChild(collapsibleContent);
-    methodFormsContainer.appendChild(extraToolsContainer);
-    toggleCollapse(collapsibleContent, toggleIcon, false);
-
-    extraToolsHeader.addEventListener('click', () => {
-      const isExpanded = collapsibleContent.classList.contains('expanded');
-      toggleCollapse(collapsibleContent, toggleIcon, !isExpanded);
-    });
+  if (!/^\d+(\.\d+)?$/.test(transferAmountValue)) {
+    alert('Invalid number for amount');
+    return;
   }
-}
-
-// Function to Get Methods for a Facet
-function getFacetMethods(facet) {
-  const facets = {
-    EscrowFacet: {
-      transferEscrow: {
-        inputs: [
-          { name: '_tokenId', type: 'uint256' },
-          { name: '_erc20Contract', type: 'address' },
-          { name: '_transferAmount', type: 'uint256' },
-        ],
-      },
-      batchTransferEscrow: {
-        inputs: [
-          { name: '_tokenIds', type: 'uint256[]' },
-          { name: '_erc20Contracts', type: 'address[]' },
-          { name: '_recipients', type: 'address[]' },
-          { name: '_transferAmounts', type: 'uint256[]' },
-        ],
-      },
-      batchDepositERC20: {
-        inputs: [
-          { name: '_tokenIds', type: 'uint256[]' },
-          { name: '_erc20Contracts', type: 'address[]' },
-          { name: '_values', type: 'uint256[]' },
-        ],
-      },
-      batchDepositGHST: {
-        inputs: [
-          { name: '_tokenIds', type: 'uint256[]' },
-          { name: '_values', type: 'uint256[]' },
-        ],
-      },
-      depositERC20: {
-        inputs: [
-          { name: '_tokenId', type: 'uint256' },
-          { name: '_erc20Contract', type: 'address' },
-          { name: '_value', type: 'uint256' },
-        ],
-      },
-    },
-    // Add other facets if needed
-  };
-
-  return facets[facet];
-}
-
-// Function to Handle Form Submission
-async function handleFormSubmit(event) {
-  event.preventDefault();
-  const form = event.target;
-  let methodName = form.getAttribute('data-method');
-  const selectedFacet = 'EscrowFacet';
-  const facetMethods = getFacetMethods(selectedFacet);
-  let method = facetMethods[methodName];
-  const formData = new FormData(form);
-
-  const args = [];
-  const submitButton = form.querySelector('.submit-button');
-  submitButton.disabled = true;
-  submitButton.innerText = 'Submitting...';
 
   try {
-    const tokenIdValue = formData.get('_tokenId');
-    const erc20ContractValue = formData.get('_erc20Contract');
-    let erc20ContractAddress = erc20ContractValue;
+    const tokenContract = new ethers.Contract(predefinedTokens[0].address, ghstABI, provider);
+    const decimals = await tokenContract.decimals();
+    const totalTransferAmount = ethers.parseUnits(transferAmountValue, decimals);
+    const totalAvailableBalance = ownedAavegotchis.reduce((acc, gotchi) => acc + BigInt(gotchi.ghstBalance), 0n);
 
-    if (erc20ContractValue === 'custom') {
-      const customAddress = formData.get('custom-erc20-address')?.trim();
-      if (!customAddress || !ethers.isAddress(customAddress)) {
-        throw new Error('Please provide a valid custom ERC20 contract address.');
-      }
-      erc20ContractAddress = customAddress;
+    if (totalTransferAmount > totalAvailableBalance) {
+      alert('The total amount exceeds the total available balance across your Aavegotchis.');
+      return;
     }
 
-    // Handle Amount
-    const amountInput = form.querySelector('input[name="_transferAmount"]');
-    let transferAmountValue = amountInput.value.trim();
+    // Calculate proportional amounts
+    const transferAmounts = ownedAavegotchis.map((gotchi) => {
+      const balance = BigInt(gotchi.ghstBalance);
+      return balance === 0n ? 0n : (balance * totalTransferAmount) / totalAvailableBalance;
+    });
 
-    if (methodName === 'transferEscrow' && tokenIdValue === 'all') {
-      // Switch to batchTransferEscrow
-      methodName = 'batchTransferEscrow';
-      method = facetMethods[methodName];
+    const _tokenIds = ownedAavegotchis.map((gotchi) => BigInt(gotchi.tokenId));
+    const _erc20Contracts = ownedAavegotchis.map(() => predefinedTokens[0].address);
+    const _recipients = ownedAavegotchis.map(() => userAddress);
+    const _transferAmounts = transferAmounts;
 
-      // Prepare arguments
-      let _tokenIds = ownedAavegotchis.map((gotchi) => ethers.getBigInt(gotchi.tokenId));
+    submitButton.disabled = true;
+    submitButton.innerText = 'Submitting...';
 
-      // Validate ownership
-      if (_tokenIds.length === 0) {
-        throw new Error('You do not own any Aavegotchis.');
-      }
-
-      // Filter Aavegotchis with positive balance of the selected token
-      const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
-      const balancePromises = _tokenIds.map(async (tokenId) => {
-        const gotchi = ownedAavegotchis.find((g) => ethers.getBigInt(g.tokenId) === tokenId);
-        const escrowWallet = gotchi.escrow;
-        const balance = await tokenContract.balanceOf(escrowWallet);
-        return { tokenId, balance };
-      });
-
-      const balancesResult = await Promise.all(balancePromises);
-      const filteredData = balancesResult.filter(({ balance }) => balance > 0n);
-
-      if (filteredData.length === 0) {
-        throw new Error('None of your Aavegotchis hold the selected token.');
-      }
-
-      // Prepare filtered arrays
-      _tokenIds = filteredData.map(({ tokenId }) => tokenId);
-      const individualBalances = filteredData.map(({ balance }) => balance);
-
-      args.push(_tokenIds);
-
-      // Prepare _erc20Contracts array
-      const _erc20Contracts = _tokenIds.map(() => erc20ContractAddress);
-      args.push(_erc20Contracts);
-
-      // Prepare _recipients array
-      const _recipients = _tokenIds.map(() => userAddress);
-      args.push(_recipients);
-
-      // Prepare _transferAmounts array
-      let _transferAmounts = [];
-
-      if (transferAmountValue === '') {
-        throw new Error('Please enter an amount or click Max.');
-      }
-
-      if (!/^\d+(\.\d+)?$/.test(transferAmountValue)) {
-        throw new Error('Invalid number for amount');
-      }
-
-      const decimals = await tokenContract.decimals();
-      const totalTransferAmount = ethers.parseUnits(transferAmountValue, decimals);
-
-      const totalAvailableBalance = individualBalances.reduce((acc, balance) => acc + balance, 0n);
-
-      if (totalTransferAmount > totalAvailableBalance) {
-        throw new Error('The total amount exceeds the total available balance across your Aavegotchis.');
-      }
-
-      if (totalTransferAmount === totalAvailableBalance) {
-        // Use individual balances as transfer amounts
-        _transferAmounts = individualBalances;
-      } else {
-        // Distribute the totalTransferAmount proportionally based on individual balances
-        const totalBalances = individualBalances.reduce((acc, balance) => acc + balance, 0n);
-        _transferAmounts = individualBalances.map((balance) =>
-          (balance * totalTransferAmount) / totalBalances
-        );
-      }
-
-      args.push(_transferAmounts);
-
-    } else {
-      // Single Aavegotchi
-      const _tokenId = ethers.getBigInt(tokenIdValue);
-      args.push(_tokenId);
-
-      // Validate ownership
-      const ownedTokenIds = ownedAavegotchis.map((gotchi) => gotchi.tokenId.toString());
-      if (!ownedTokenIds.includes(_tokenId.toString())) {
-        throw new Error('You do not own the selected Aavegotchi.');
-      }
-
-      args.push(erc20ContractAddress);
-      args.push(userAddress); // _recipient
-
-      if (transferAmountValue === '') {
-        throw new Error('Please enter an amount or click Max.');
-      }
-
-      if (!/^\d+(\.\d+)?$/.test(transferAmountValue)) {
-        throw new Error('Invalid number for amount');
-      }
-
-      const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
-      const decimals = await tokenContract.decimals();
-      const transferAmount = ethers.parseUnits(transferAmountValue, decimals);
-
-      args.push(transferAmount);
-    }
-
-    const tx = await contract[methodName](...args);
+    const tx = await contract.batchTransferEscrow(_tokenIds, _erc20Contracts, _recipients, _transferAmounts);
     alert(`Transaction submitted. Hash: ${tx.hash}`);
     await tx.wait();
     alert('Transaction confirmed!');
+    
+    // Refresh Aavegotchi data after withdrawal
+    await fetchAndDisplayAavegotchis(userAddress);
+    generateMethodForms();
   } catch (error) {
     console.error(error);
     alert(`Error: ${error.info?.error?.message || error.message}`);
   } finally {
     submitButton.disabled = false;
-    submitButton.innerText = 'Submit';
+    submitButton.innerText = 'Withdraw Proportionally';
   }
 }
 
-// Function to Toggle Collapse
+// Function to Handle Equal Withdraw
+async function handleEqualWithdraw(event) {
+  event.preventDefault();
+  const form = event.target;
+  const amountInput = form.querySelector('#equal-amount');
+  const breakdownContainer = document.getElementById('equal-breakdown');
+  const submitButton = form.querySelector('.submit-button');
+
+  let transferAmountValue = amountInput.value.trim();
+
+  if (transferAmountValue === '') {
+    alert('Please enter an amount or click Max.');
+    return;
+  }
+
+  if (!/^\d+(\.\d+)?$/.test(transferAmountValue)) {
+    alert('Invalid number for amount');
+    return;
+  }
+
+  try {
+    const tokenContract = new ethers.Contract(predefinedTokens[0].address, ghstABI, provider);
+    const decimals = await tokenContract.decimals();
+    const totalTransferAmount = ethers.parseUnits(transferAmountValue, decimals);
+    const totalAvailableBalance = ownedAavegotchis.reduce((acc, gotchi) => acc + BigInt(gotchi.ghstBalance), 0n);
+    const numberOfGotchis = ownedAavegotchis.length;
+
+    if (totalTransferAmount > totalAvailableBalance) {
+      alert('The total amount exceeds the total available balance across your Aavegotchis.');
+      return;
+    }
+
+    // Calculate equal amounts
+    const equalAmount = totalTransferAmount / BigInt(numberOfGotchis);
+    const remainder = totalTransferAmount % BigInt(numberOfGotchis);
+
+    const transferAmounts = ownedAavegotchis.map((gotchi, index) => {
+      let amount = equalAmount;
+      if (index < Number(remainder)) {
+        amount += 1n; // Distribute the remainder
+      }
+      return amount;
+    });
+
+    const _tokenIds = ownedAavegotchis.map((gotchi) => BigInt(gotchi.tokenId));
+    const _erc20Contracts = ownedAavegotchis.map(() => predefinedTokens[0].address);
+    const _recipients = ownedAavegotchis.map(() => userAddress);
+    const _transferAmounts = transferAmounts;
+
+    submitButton.disabled = true;
+    submitButton.innerText = 'Submitting...';
+
+    const tx = await contract.batchTransferEscrow(_tokenIds, _erc20Contracts, _recipients, _transferAmounts);
+    alert(`Transaction submitted. Hash: ${tx.hash}`);
+    await tx.wait();
+    alert('Transaction confirmed!');
+    
+    // Refresh Aavegotchi data after withdrawal
+    await fetchAndDisplayAavegotchis(userAddress);
+    generateMethodForms();
+  } catch (error) {
+    console.error(error);
+    alert(`Error: ${error.info?.error?.message || error.message}`);
+  } finally {
+    submitButton.disabled = false;
+    submitButton.innerText = 'Withdraw Equally';
+  }
+}
+
+// Function to Handle User-Specified Withdraw
+async function handleUserSpecifiedWithdraw(event) {
+  event.preventDefault();
+  const form = event.target;
+  const totalAmountInput = form.querySelector('#user-total-amount');
+  const allocationInputs = form.querySelectorAll('input[name^="allocation-"]');
+  const validationMessage = document.getElementById('user-validation');
+  const submitButton = form.querySelector('.submit-button');
+
+  let totalDesired = parseFloat(totalAmountInput.value.trim());
+  let totalAllocated = 0;
+  let allocations = [];
+
+  if (isNaN(totalDesired) || totalDesired <= 0) {
+    alert('Please enter a valid total withdrawal amount.');
+    return;
+  }
+
+  allocationInputs.forEach((input) => {
+    const value = parseFloat(input.value.trim());
+    if (isNaN(value) || value < 0) {
+      alert('Please enter valid numbers for all allocations.');
+      return;
+    }
+    allocations.push(value);
+    totalAllocated += value;
+  });
+
+  if (totalAllocated !== totalDesired) {
+    alert(`Total allocated (${totalAllocated} GHST) does not match desired amount (${totalDesired} GHST).`);
+    return;
+  }
+
+  try {
+    const tokenContract = new ethers.Contract(predefinedTokens[0].address, ghstABI, provider);
+    const decimals = await tokenContract.decimals();
+    const totalTransferAmount = ethers.parseUnits(totalAmountInput.value.trim(), decimals);
+    const totalAvailableBalance = ownedAavegotchis.reduce((acc, gotchi) => acc + BigInt(gotchi.ghstBalance), 0n);
+
+    if (totalTransferAmount > totalAvailableBalance) {
+      alert('The total amount exceeds the total available balance across your Aavegotchis.');
+      return;
+    }
+
+    // Convert allocations to BigInt in smallest unit
+    const transferAmounts = allocations.map((amount) => ethers.parseUnits(amount.toString(), decimals).toBigInt());
+
+    const _tokenIds = ownedAavegotchis.map((gotchi) => BigInt(gotchi.tokenId));
+    const _erc20Contracts = ownedAavegotchis.map(() => predefinedTokens[0].address);
+    const _recipients = ownedAavegotchis.map(() => userAddress);
+    const _transferAmounts = transferAmounts;
+
+    submitButton.disabled = true;
+    submitButton.innerText = 'Submitting...';
+
+    const tx = await contract.batchTransferEscrow(_tokenIds, _erc20Contracts, _recipients, _transferAmounts);
+    alert(`Transaction submitted. Hash: ${tx.hash}`);
+    await tx.wait();
+    alert('Transaction confirmed!');
+    
+    // Refresh Aavegotchi data after withdrawal
+    await fetchAndDisplayAavegotchis(userAddress);
+    generateMethodForms();
+  } catch (error) {
+    console.error(error);
+    alert(`Error: ${error.info?.error?.message || error.message}`);
+  } finally {
+    submitButton.disabled = false;
+    submitButton.innerText = 'Withdraw as Specified';
+  }
+}
+
+// Function to Toggle Collapse (Unused in Tab-Based UI but kept for consistency)
 function toggleCollapse(contentElement, iconElement, expand) {
   if (expand) {
     contentElement.classList.add('expanded');
@@ -835,12 +666,19 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     const balances = await Promise.all(balancePromises);
     const lendingStatuses = await Promise.all(lendingStatusPromises);
 
+    ownedAavegotchis = []; // Reset owned Aavegotchis
+
     aavegotchis.forEach((aavegotchi, index) => {
       const isLent = lendingStatuses[index];
       const isOwned = !isLent;
 
       if (isOwned) {
-        ownedAavegotchis.push(aavegotchi);
+        ownedAavegotchis.push({
+          tokenId: aavegotchi.tokenId.toString(),
+          name: aavegotchi.name,
+          escrow: aavegotchi.escrow,
+          ghstBalance: balances[index].toString(),
+        });
       }
 
       const row = document.createElement('tr');
@@ -920,6 +758,9 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     aavegotchiInfoContainer.appendChild(table);
 
     initializeCopyButtons();
+
+    // After fetching Aavegotchis, regenerate user-specified allocation form
+    generateMethodForms();
   } catch (error) {
     console.error('Error fetching Aavegotchis:', error);
     aavegotchiInfoContainer.innerHTML = '<p>Error fetching Aavegotchis. See console for details.</p>';
@@ -950,112 +791,203 @@ function initializeCopyButtons() {
   });
 }
 
-// Function to Update Max Button
-async function updateMaxButton(form) {
-  const tokenIdSelect = form.querySelector('select[name="_tokenId"]');
-  const erc20ContractSelect = form.querySelector('select[name="_erc20Contract"]');
-  const customErc20Input = form.querySelector('input[name="custom-erc20-address"]');
+// Function to Update Proportional Breakdown
+async function updateProportionalBreakdown(form, breakdownContainer) {
+  const amountInput = form.querySelector('#proportional-amount');
+  const amountValue = amountInput.value.trim();
 
-  const tokenIdValue = tokenIdSelect ? tokenIdSelect.value : null;
-  let erc20Address = erc20ContractSelect ? erc20ContractSelect.value : null;
+  breakdownContainer.innerHTML = '';
 
-  if (erc20Address === 'custom') {
-    erc20Address = customErc20Input ? customErc20Input.value : null;
-  }
-
-  if (!erc20Address || !ethers.isAddress(erc20Address)) {
+  if (amountValue === '' || !/^\d+(\.\d+)?$/.test(amountValue)) {
     return;
   }
 
-  const amountInput = form.querySelector('input[name="_transferAmount"]');
-  const maxButton = form.querySelector('.max-button');
+  const totalDesired = parseFloat(amountValue);
+  const totalAvailable = ownedAavegotchis.reduce((acc, gotchi) => acc + parseFloat(ethers.formatUnits(gotchi.ghstBalance, await getDecimals())), 0);
 
-  if (!tokenIdValue || !amountInput || !maxButton) return;
-
-  // Disable Max button until balances are fetched
-  maxButton.disabled = true;
-  maxButton.innerText = 'Loading...';
-
-  try {
-    let totalBalance = 0n;
-    const tokenContract = new ethers.Contract(erc20Address, ghstABI, provider);
-
-    if (tokenIdValue === 'all') {
-      const balancePromises = ownedAavegotchis.map(async (gotchi) => {
-        const escrowWallet = gotchi.escrow;
-        const balance = await tokenContract.balanceOf(escrowWallet);
-        return { gotchi, balance };
-      });
-
-      const balancesResult = await Promise.all(balancePromises);
-
-      // Filter out Aavegotchis with zero balance
-      const filteredData = balancesResult.filter(({ balance }) => balance > 0n);
-
-      if (filteredData.length === 0) {
-        maxButton.disabled = true;
-        maxButton.innerText = 'Max';
-        alert('None of your Aavegotchis hold the selected token.');
-        return;
-      }
-
-      const balances = filteredData.map(({ balance }) => balance);
-      const tokenIds = filteredData.map(({ gotchi }) => gotchi.tokenId);
-
-      balances.forEach((balance) => {
-        totalBalance += balance;
-      });
-
-      // Store individual balances for batch transfer
-      maxButton.dataset.individualBalances = balances.map((b) => b.toString()).join(',');
-      maxButton.dataset.tokenIds = tokenIds.map((id) => id.toString()).join(',');
-      maxButton.dataset.maxValue = totalBalance.toString();
-
-      // Do not set amountInput.value here
-    } else {
-      const gotchi = ownedAavegotchis.find((g) => g.tokenId.toString() === tokenIdValue);
-      if (!gotchi) throw new Error('Selected Aavegotchi not found.');
-      const escrowWallet = gotchi.escrow;
-      totalBalance = await tokenContract.balanceOf(escrowWallet);
-      maxButton.dataset.maxValue = totalBalance.toString();
-    }
-
-    maxButton.disabled = false;
-    maxButton.innerText = 'Max';
-  } catch (error) {
-    console.error('Error fetching token balance:', error);
-    maxButton.disabled = true;
-    maxButton.innerText = 'Max';
+  if (totalDesired > totalAvailable) {
+    breakdownContainer.innerHTML = '<p style="color: #dc3545;">Desired amount exceeds total available balance.</p>';
+    return;
   }
+
+  const breakdownTable = document.createElement('table');
+  breakdownTable.className = 'aavegotchi-table';
+
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  const headers = ['Aavegotchi Name', 'Token ID', 'Withdraw Amount'];
+  headers.forEach((headerText) => {
+    const th = document.createElement('th');
+    th.innerText = headerText;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  breakdownTable.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+
+  ownedAavegotchis.forEach((gotchi) => {
+    const balance = parseFloat(ethers.formatUnits(gotchi.ghstBalance, await getDecimals()));
+    const withdrawAmount = ((balance / totalAvailable) * totalDesired).toFixed(4);
+
+    const row = document.createElement('tr');
+
+    const nameCell = document.createElement('td');
+    nameCell.innerText = gotchi.name;
+    row.appendChild(nameCell);
+
+    const tokenIdCell = document.createElement('td');
+    tokenIdCell.innerText = gotchi.tokenId;
+    row.appendChild(tokenIdCell);
+
+    const amountCell = document.createElement('td');
+    amountCell.innerText = `${withdrawAmount} GHST`;
+    row.appendChild(amountCell);
+
+    tbody.appendChild(row);
+  });
+
+  breakdownTable.appendChild(tbody);
+  breakdownContainer.appendChild(breakdownTable);
+}
+
+// Function to Update Equal Breakdown
+async function updateEqualBreakdown(form, breakdownContainer) {
+  const amountInput = form.querySelector('#equal-amount');
+  const amountValue = amountInput.value.trim();
+
+  breakdownContainer.innerHTML = '';
+
+  if (amountValue === '' || !/^\d+(\.\d+)?$/.test(amountValue)) {
+    return;
+  }
+
+  const totalDesired = parseFloat(amountValue);
+  const totalAvailable = ownedAavegotchis.reduce((acc, gotchi) => acc + parseFloat(ethers.formatUnits(gotchi.ghstBalance, await getDecimals())), 0);
+
+  if (totalDesired > totalAvailable) {
+    breakdownContainer.innerHTML = '<p style="color: #dc3545;">Desired amount exceeds total available balance.</p>';
+    return;
+  }
+
+  const numberOfGotchis = ownedAavegotchis.length;
+  const equalAmount = (totalDesired / numberOfGotchis).toFixed(4);
+
+  const breakdownTable = document.createElement('table');
+  breakdownTable.className = 'aavegotchi-table';
+
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  const headers = ['Aavegotchi Name', 'Token ID', 'Withdraw Amount'];
+  headers.forEach((headerText) => {
+    const th = document.createElement('th');
+    th.innerText = headerText;
+    headerRow.appendChild(th);
+  });
+  thead.appendChild(headerRow);
+  breakdownTable.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+
+  ownedAavegotchis.forEach((gotchi) => {
+    const row = document.createElement('tr');
+
+    const nameCell = document.createElement('td');
+    nameCell.innerText = gotchi.name;
+    row.appendChild(nameCell);
+
+    const tokenIdCell = document.createElement('td');
+    tokenIdCell.innerText = gotchi.tokenId;
+    row.appendChild(tokenIdCell);
+
+    const amountCell = document.createElement('td');
+    amountCell.innerText = `${equalAmount} GHST`;
+    row.appendChild(amountCell);
+
+    tbody.appendChild(row);
+  });
+
+  breakdownTable.appendChild(tbody);
+  breakdownContainer.appendChild(breakdownTable);
+}
+
+// Function to Get Decimals (Assuming all tokens have the same decimals)
+async function getDecimals() {
+  const decimals = await ghstContract.decimals();
+  return decimals;
 }
 
 // Function to Handle Max Button Click
-async function handleMaxButtonClick(form) {
-  const amountInput = form.querySelector('input[name="_transferAmount"]');
-  const maxButton = form.querySelector('.max-button');
-  const maxValue = maxButton.dataset.maxValue;
+async function handleMaxButtonClick(form, mode) {
+  const tokenContract = new ethers.Contract(predefinedTokens[0].address, ghstABI, provider);
+  const decimals = await tokenContract.decimals();
+  let maxValue = 0;
 
-  if (maxValue) {
-    const tokenIdSelect = form.querySelector('select[name="_tokenId"]');
-    const erc20ContractSelect = form.querySelector('select[name="_erc20Contract"]');
-    const customErc20Input = form.querySelector('input[name="custom-erc20-address"]');
-    let erc20Address = erc20ContractSelect ? erc20ContractSelect.value : null;
+  if (mode === 'proportional' || mode === 'equal') {
+    maxValue = ownedAavegotchis.reduce((acc, gotchi) => acc + BigInt(gotchi.ghstBalance), 0n);
+  } else if (mode === 'user-specified') {
+    // For user-specified, set the total to the total available
+    maxValue = ownedAavegotchis.reduce((acc, gotchi) => acc + BigInt(gotchi.ghstBalance), 0n);
+  }
 
-    if (erc20Address === 'custom') {
-      erc20Address = customErc20Input ? customErc20Input.value : null;
-    }
+  const formattedMax = ethers.formatUnits(maxValue, decimals);
 
-    const tokenContract = new ethers.Contract(erc20Address, ghstABI, provider);
-    const decimals = await tokenContract.decimals();
+  if (mode === 'proportional') {
+    const amountInput = form.querySelector('#proportional-amount');
+    amountInput.value = formattedMax;
+    const breakdownContainer = document.getElementById('proportional-breakdown');
+    await updateProportionalBreakdown(form, breakdownContainer);
+  } else if (mode === 'equal') {
+    const amountInput = form.querySelector('#equal-amount');
+    amountInput.value = formattedMax;
+    const breakdownContainer = document.getElementById('equal-breakdown');
+    await updateEqualBreakdown(form, breakdownContainer);
+  } else if (mode === 'user-specified') {
+    const totalAmountInput = form.querySelector('#user-total-amount');
+    totalAmountInput.value = formattedMax;
 
-    const formattedValue = ethers.formatUnits(maxValue, decimals);
-    amountInput.value = formattedValue;
+    // Automatically distribute equally
+    const allocationInputs = form.querySelectorAll('input[name^="allocation-"]');
+    const numberOfGotchis = allocationInputs.length;
+    const equalAllocation = parseFloat(formattedMax) / numberOfGotchis;
+
+    allocationInputs.forEach((input) => {
+      input.value = equalAllocation.toFixed(4);
+    });
+
+    const validationMessage = document.getElementById('user-validation');
+    validationMessage.innerText = `Total allocated: ${formattedMax} GHST`;
   }
 }
 
-// Initial call to generate method forms if the wallet is already connected
+// Function to Handle Tab Switching
+function handleTabSwitching() {
+  const tabButtons = document.querySelectorAll('.tab-button');
+  const tabContents = document.querySelectorAll('.tab-content');
+
+  tabButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      // Remove active class from all buttons
+      tabButtons.forEach((btn) => btn.classList.remove('active'));
+      // Hide all tab contents
+      tabContents.forEach((content) => content.classList.add('hidden'));
+      
+      // Add active class to clicked button
+      button.classList.add('active');
+      // Show corresponding tab content
+      const tabId = button.getAttribute('data-tab');
+      document.getElementById(tabId).classList.remove('hidden');
+    });
+  });
+}
+
+// Initialize Tabs on Window Load
 window.onload = async () => {
   if (window.ethereum && window.ethereum.selectedAddress) {
     await connectWallet();
   }
+  handleTabSwitching();
 };
+
+// Initial call to generate method forms if the wallet is already connected
+// This is now handled within fetchAndDisplayAavegotchis and generateMethodForms
