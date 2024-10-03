@@ -63,6 +63,7 @@ header {
   color: var(--color-light-pink);
 }
 
+/* Header Left Section */
 .header-left {
   max-width: 70%;
 }
@@ -107,6 +108,7 @@ header p {
   font-size: 16px;
 }
 
+/* Wallet Info Styles */
 .wallet-info {
   margin-top: 30px;
 }

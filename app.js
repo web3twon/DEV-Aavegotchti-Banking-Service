@@ -285,12 +285,6 @@ function capitalizeFirstLetter(string) {
 
 // Function to Generate Method Forms (Tab-Based)
 function generateMethodForms() {
-  methodFormsContainer.innerHTML = '';
-  if (!contract) {
-    methodFormsContainer.innerHTML = '<p>Please connect your wallet to interact with the contract.</p>';
-    return;
-  }
-
   // The forms are already defined in the HTML via tabs, so no need to generate them here
   // However, we need to initialize the forms based on the active tab
 
@@ -333,6 +327,9 @@ function initializeUserSpecifiedForm() {
   const userMaxButton = userForm.querySelector('.max-button');
   const userAllocationContainer = document.getElementById('user-allocation');
   const userValidationMessage = document.getElementById('user-validation');
+
+  // Clear previous allocations if any
+  userAllocationContainer.innerHTML = '';
 
   // Dynamically generate allocation fields based on owned Aavegotchis
   ownedAavegotchis.forEach((gotchi) => {
@@ -399,9 +396,9 @@ function validateUserSpecifiedForm() {
     }
     if (totalAllocated !== totalDesired) {
       valid = false;
-      userValidationMessage.innerText = `Total allocated (${totalAllocated} GHST) does not match desired amount (${totalDesired} GHST).`;
+      userValidationMessage.innerText = `Total allocated: ${totalAllocated} GHST does not match desired amount: ${totalDesired} GHST.`;
     } else {
-      userValidationMessage.innerText = '';
+      userValidationMessage.innerText = `Total allocated: ${totalAllocated} GHST`;
     }
   }
 }
@@ -411,7 +408,6 @@ async function handleProportionalWithdraw(event) {
   event.preventDefault();
   const form = event.target;
   const amountInput = form.querySelector('#proportional-amount');
-  const breakdownContainer = document.getElementById('proportional-breakdown');
   const submitButton = form.querySelector('.submit-button');
 
   let transferAmountValue = amountInput.value.trim();
@@ -473,7 +469,6 @@ async function handleEqualWithdraw(event) {
   event.preventDefault();
   const form = event.target;
   const amountInput = form.querySelector('#equal-amount');
-  const breakdownContainer = document.getElementById('equal-breakdown');
   const submitButton = form.querySelector('.submit-button');
 
   let transferAmountValue = amountInput.value.trim();
@@ -543,7 +538,6 @@ async function handleUserSpecifiedWithdraw(event) {
   const form = event.target;
   const totalAmountInput = form.querySelector('#user-total-amount');
   const allocationInputs = form.querySelectorAll('input[name^="allocation-"]');
-  const validationMessage = document.getElementById('user-validation');
   const submitButton = form.querySelector('.submit-button');
 
   let totalDesired = parseFloat(totalAmountInput.value.trim());
@@ -609,21 +603,6 @@ async function handleUserSpecifiedWithdraw(event) {
   }
 }
 
-// Function to Toggle Collapse (Unused in Tab-Based UI but kept for consistency)
-function toggleCollapse(contentElement, iconElement, expand) {
-  if (expand) {
-    contentElement.classList.add('expanded');
-    iconElement.classList.remove('collapsed');
-    iconElement.classList.add('expanded');
-    iconElement.innerHTML = '&#9650;';
-  } else {
-    contentElement.classList.remove('expanded');
-    iconElement.classList.remove('expanded');
-    iconElement.classList.add('collapsed');
-    iconElement.innerHTML = '&#9660;';
-  }
-}
-
 // Function to Fetch and Display Aavegotchis
 async function fetchAndDisplayAavegotchis(ownerAddress) {
   try {
@@ -635,7 +614,6 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     }
 
     const ghstDecimals = await ghstContract.decimals();
-    const ghstSymbol = await ghstContract.symbol();
 
     const table = document.createElement('table');
     table.className = 'aavegotchi-table';
@@ -803,7 +781,11 @@ async function updateProportionalBreakdown(form, breakdownContainer) {
   }
 
   const totalDesired = parseFloat(amountValue);
-  const totalAvailable = ownedAavegotchis.reduce((acc, gotchi) => acc + parseFloat(ethers.formatUnits(gotchi.ghstBalance, await getDecimals())), 0);
+  const decimals = await ghstContract.decimals();
+  const totalAvailable = ownedAavegotchis.reduce(
+    (acc, gotchi) => acc + parseFloat(ethers.formatUnits(BigInt(gotchi.ghstBalance), decimals)),
+    0
+  );
 
   if (totalDesired > totalAvailable) {
     breakdownContainer.innerHTML = '<p style="color: #dc3545;">Desired amount exceeds total available balance.</p>';
@@ -827,7 +809,7 @@ async function updateProportionalBreakdown(form, breakdownContainer) {
   const tbody = document.createElement('tbody');
 
   ownedAavegotchis.forEach((gotchi) => {
-    const balance = parseFloat(ethers.formatUnits(gotchi.ghstBalance, await getDecimals()));
+    const balance = parseFloat(ethers.formatUnits(BigInt(gotchi.ghstBalance), decimals));
     const withdrawAmount = ((balance / totalAvailable) * totalDesired).toFixed(4);
 
     const row = document.createElement('tr');
@@ -863,7 +845,11 @@ async function updateEqualBreakdown(form, breakdownContainer) {
   }
 
   const totalDesired = parseFloat(amountValue);
-  const totalAvailable = ownedAavegotchis.reduce((acc, gotchi) => acc + parseFloat(ethers.formatUnits(gotchi.ghstBalance, await getDecimals())), 0);
+  const decimals = await ghstContract.decimals();
+  const totalAvailable = ownedAavegotchis.reduce(
+    (acc, gotchi) => acc + parseFloat(ethers.formatUnits(BigInt(gotchi.ghstBalance), decimals)),
+    0
+  );
 
   if (totalDesired > totalAvailable) {
     breakdownContainer.innerHTML = '<p style="color: #dc3545;">Desired amount exceeds total available balance.</p>';
@@ -911,22 +897,13 @@ async function updateEqualBreakdown(form, breakdownContainer) {
   breakdownContainer.appendChild(breakdownTable);
 }
 
-// Function to Get Decimals (Assuming all tokens have the same decimals)
-async function getDecimals() {
-  const decimals = await ghstContract.decimals();
-  return decimals;
-}
-
 // Function to Handle Max Button Click
 async function handleMaxButtonClick(form, mode) {
   const tokenContract = new ethers.Contract(predefinedTokens[0].address, ghstABI, provider);
   const decimals = await tokenContract.decimals();
-  let maxValue = 0;
+  let maxValue = 0n;
 
-  if (mode === 'proportional' || mode === 'equal') {
-    maxValue = ownedAavegotchis.reduce((acc, gotchi) => acc + BigInt(gotchi.ghstBalance), 0n);
-  } else if (mode === 'user-specified') {
-    // For user-specified, set the total to the total available
+  if (mode === 'proportional' || mode === 'equal' || mode === 'user-specified') {
     maxValue = ownedAavegotchis.reduce((acc, gotchi) => acc + BigInt(gotchi.ghstBalance), 0n);
   }
 
@@ -955,8 +932,7 @@ async function handleMaxButtonClick(form, mode) {
       input.value = equalAllocation.toFixed(4);
     });
 
-    const validationMessage = document.getElementById('user-validation');
-    validationMessage.innerText = `Total allocated: ${formattedMax} GHST`;
+    validateUserSpecifiedForm();
   }
 }
 
@@ -988,6 +964,3 @@ window.onload = async () => {
   }
   handleTabSwitching();
 };
-
-// Initial call to generate method forms if the wallet is already connected
-// This is now handled within fetchAndDisplayAavegotchis and generateMethodForms
