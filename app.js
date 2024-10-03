@@ -656,16 +656,6 @@ async function handleFormSubmit(event) {
       erc20ContractAddress = customAddress;
     }
 
-    // Fetch the token symbol dynamically
-    const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
-    let tokenSymbol;
-    try {
-      tokenSymbol = await tokenContract.symbol();
-    } catch (symbolError) {
-      console.warn('Unable to fetch token symbol. Using "TOKEN".');
-      tokenSymbol = 'TOKEN';
-    }
-
     // Handle Amount
     const amountInput = form.querySelector('input[name="_transferAmount"]');
     let transferAmountValue = amountInput.value.trim();
@@ -684,11 +674,13 @@ async function handleFormSubmit(event) {
       }
 
       // Filter Aavegotchis with positive balance of the selected token
+      const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
       const balancePromises = _tokenIds.map(async (tokenId) => {
         const gotchi = ownedAavegotchis.find((g) => ethers.getBigInt(g.tokenId) === tokenId);
         const escrowWallet = gotchi.escrow;
         const balance = await tokenContract.balanceOf(escrowWallet);
-        return { tokenId, balance };
+        const symbol = await tokenContract.symbol();
+        return { tokenId, balance, symbol, name: gotchi.name };
       });
 
       const balancesResult = await Promise.all(balancePromises);
@@ -731,8 +723,7 @@ async function handleFormSubmit(event) {
           totalTransferAmount,
           decimals,
           tokenContract,
-          filteredData.map((data) => ownedAavegotchis.find(g => ethers.getBigInt(g.tokenId) === data.tokenId).name),
-          tokenSymbol // Pass the token symbol to the modal
+          filteredData.map((data) => data.name)
         );
       }
 
@@ -769,6 +760,7 @@ async function handleFormSubmit(event) {
         throw new Error('Invalid number for amount');
       }
 
+      const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
       const decimals = await tokenContract.decimals();
       const transferAmount = ethers.parseUnits(transferAmountValue, decimals);
 
@@ -789,7 +781,7 @@ async function handleFormSubmit(event) {
 }
 
 // Function to Get User-Specified Amounts via Popup
-async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTransferAmount, decimals, tokenContract, aavegotchiNames, tokenSymbol) {
+async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTransferAmount, decimals, tokenContract, aavegotchiNames) {
   return new Promise((resolve, reject) => {
     // Create the modal overlay
     const modalOverlay = document.createElement('div');
@@ -799,15 +791,21 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
     const modalContent = document.createElement('div');
     modalContent.className = 'modal-content';
 
-    // Instruction text with total amount
+    // Modal header
     const modalHeader = document.createElement('h2');
-    instruction.innerText = `Specify Withdrawal Amounts Per Aavegotchi ensuring the total amount equals ${ethers.formatUnits(totalTransferAmount, decimals)} ${tokenSymbol}`;
+    modalHeader.innerText = 'Specify Withdrawal Amounts Per Aavegotchi';
     modalContent.appendChild(modalHeader);
+
+    // Instruction text with total amount
+    const instruction = document.createElement('p');
+    instruction.className = 'instruction';
+    instruction.innerText = `Specify Withdrawal Amounts Per Aavegotchi ensuring the total amount equals ${ethers.formatUnits(totalTransferAmount, decimals)} tokens`;
+    modalContent.appendChild(instruction);
 
     // Total display
     const totalDisplay = document.createElement('div');
     totalDisplay.className = 'total-display incorrect';
-    totalDisplay.innerText = `Total Entered: 0.0 ${tokenSymbol}`;
+    totalDisplay.innerText = `Total Entered: 0.0`;
     modalContent.appendChild(totalDisplay);
 
     // Create form
@@ -825,7 +823,7 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
       formGroup.className = 'form-group';
 
       const label = document.createElement('label');
-      label.innerText = `Aavegotchi ID ${tokenId} (${aavegotchiName}) (Balance: ${balanceFormatted} ${tokenSymbol}):`;
+      label.innerText = `Aavegotchi ID ${tokenId} (${aavegotchiName}) (Balance: ${balanceFormatted}):`;
 
       const input = document.createElement('input');
       input.type = 'number';
@@ -883,7 +881,7 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
       });
 
       const formattedTotal = ethers.formatUnits(totalEntered, decimals);
-      totalDisplay.innerText = `Total Entered: ${formattedTotal} ${tokenSymbol}`;
+      totalDisplay.innerText = `Total Entered: ${formattedTotal}`;
 
       if (totalEntered === totalTransferAmount) {
         totalDisplay.classList.remove('incorrect');
@@ -973,8 +971,7 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     }
 
     const ghstDecimals = await ghstContract.decimals();
-    // Removed GHST symbol from the main table as per user request
-    // const ghstSymbol = await ghstContract.symbol(); // Removed
+    const ghstSymbol = await ghstContract.symbol();
 
     const table = document.createElement('table');
     table.className = 'aavegotchi-table';
@@ -1060,12 +1057,12 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
 
       row.appendChild(escrowCell);
 
-      // GHST Balance Cell without Token Symbol (removed as per user request)
+      // GHST Balance Cell with Token Symbol
       const ghstBalanceRaw = balances[index];
       const ghstBalance = ethers.formatUnits(ghstBalanceRaw, ghstDecimals);
       const ghstBalanceCell = document.createElement('td');
       ghstBalanceCell.setAttribute('data-label', 'GHST Balance');
-      ghstBalanceCell.innerText = ghstBalance; // Removed token symbol
+      ghstBalanceCell.innerText = `${ghstBalance} ${ghstSymbol}`;
       row.appendChild(ghstBalanceCell);
 
       // Status Cell
@@ -1149,15 +1146,6 @@ async function updateMaxButton(form) {
     let totalBalance = 0n;
     const tokenContract = new ethers.Contract(erc20Address, ghstABI, provider);
 
-    // Fetch token symbol to display in the modal
-    let tokenSymbol;
-    try {
-      tokenSymbol = await tokenContract.symbol();
-    } catch (symbolError) {
-      console.warn('Unable to fetch token symbol. Using "TOKEN".');
-      tokenSymbol = 'TOKEN';
-    }
-
     if (tokenIdValue === 'all') {
       const balancePromises = ownedAavegotchis.map(async (gotchi) => {
         const escrowWallet = gotchi.escrow;
@@ -1183,7 +1171,6 @@ async function updateMaxButton(form) {
 
       // Store individual balances for batch transfer
       maxButton.dataset.maxValue = totalBalance.toString();
-      maxButton.dataset.tokenSymbol = tokenSymbol;
 
       // Do not set amountInput.value here
     } else {
@@ -1192,7 +1179,6 @@ async function updateMaxButton(form) {
       const escrowWallet = gotchi.escrow;
       totalBalance = await tokenContract.balanceOf(escrowWallet);
       maxButton.dataset.maxValue = totalBalance.toString();
-      maxButton.dataset.tokenSymbol = tokenSymbol;
     }
 
     maxButton.disabled = false;
@@ -1209,12 +1195,12 @@ async function handleMaxButtonClick(form) {
   const amountInput = form.querySelector('input[name="_transferAmount"]');
   const maxButton = form.querySelector('.max-button');
   const maxValue = maxButton.dataset.maxValue;
-  const tokenSymbol = maxButton.dataset.tokenSymbol || 'TOKEN';
 
   if (maxValue) {
-    const tokenContractSelect = form.querySelector('select[name="_erc20Contract"]');
+    const tokenIdSelect = form.querySelector('select[name="_tokenId"]');
+    const erc20ContractSelect = form.querySelector('select[name="_erc20Contract"]');
     const customErc20Input = form.querySelector('input[name="custom-erc20-address"]');
-    let erc20Address = tokenContractSelect ? tokenContractSelect.value : null;
+    let erc20Address = erc20ContractSelect ? erc20ContractSelect.value : null;
 
     if (erc20Address === 'custom') {
       erc20Address = customErc20Input ? customErc20Input.value : null;
@@ -1224,7 +1210,7 @@ async function handleMaxButtonClick(form) {
     const decimals = await tokenContract.decimals();
 
     const formattedValue = ethers.formatUnits(maxValue, decimals);
-    amountInput.value = `${formattedValue} ${tokenSymbol}`;
+    amountInput.value = formattedValue;
   }
 }
 
