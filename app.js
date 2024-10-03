@@ -807,7 +807,7 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
     // Instruction text with total amount
     const instruction = document.createElement('p');
     instruction.className = 'instruction';
-    instruction.innerText = `Specify Withdrawal Amounts Per Aavegotchi ensuring the total amount equals ${ethers.formatUnits(totalTransferAmount, decimals)} tokens`;
+    instruction.innerText = `Specify Withdrawal Amounts Per Aavegotchi ensuring the total amount equals ${ethers.formatUnits(totalTransferAmount, decimals)} ${tokenSymbol}`;
     modalContent.appendChild(instruction);
 
     // Total display
