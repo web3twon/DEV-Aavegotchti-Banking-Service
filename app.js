@@ -692,19 +692,7 @@ async function handleFormSubmit(event) {
       // Prepare filtered arrays
       _tokenIds = filteredData.map(({ tokenId }) => tokenId);
       const individualBalances = filteredData.map(({ balance }) => balance);
-
-      args.push(_tokenIds);
-
-      // Prepare _erc20Contracts array
-      const _erc20Contracts = _tokenIds.map(() => erc20ContractAddress);
-      args.push(_erc20Contracts);
-
-      // Prepare _recipients array
-      const _recipients = _tokenIds.map(() => userAddress);
-      args.push(_recipients);
-
-      // Prepare _transferAmounts array
-      let _transferAmounts = [];
+      const totalAvailableBalance = individualBalances.reduce((acc, balance) => acc + balance, 0n);
 
       if (transferAmountValue === '') {
         throw new Error('Please enter an amount or click Max.');
@@ -717,22 +705,29 @@ async function handleFormSubmit(event) {
       const decimals = await tokenContract.decimals();
       const totalTransferAmount = ethers.parseUnits(transferAmountValue, decimals);
 
-      const totalAvailableBalance = individualBalances.reduce((acc, balance) => acc + balance, 0n);
-
       if (totalTransferAmount > totalAvailableBalance) {
         throw new Error('The total amount exceeds the total available balance across your Aavegotchis.');
       }
+
+      let _transferAmounts = [];
 
       if (totalTransferAmount === totalAvailableBalance) {
         // Use individual balances as transfer amounts
         _transferAmounts = individualBalances;
       } else {
-        // Distribute the totalTransferAmount proportionally based on individual balances
-        const totalBalances = individualBalances.reduce((acc, balance) => acc + balance, 0n);
-        _transferAmounts = individualBalances.map((balance) =>
-          (balance * totalTransferAmount) / totalBalances
-        );
+        // Show popup for user to specify amounts per Aavegotchi
+        _transferAmounts = await getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTransferAmount, decimals, tokenContract);
       }
+
+      args.push(_tokenIds);
+
+      // Prepare _erc20Contracts array
+      const _erc20Contracts = _tokenIds.map(() => erc20ContractAddress);
+      args.push(_erc20Contracts);
+
+      // Prepare _recipients array
+      const _recipients = _tokenIds.map(() => userAddress);
+      args.push(_recipients);
 
       args.push(_transferAmounts);
 
@@ -776,6 +771,132 @@ async function handleFormSubmit(event) {
     submitButton.disabled = false;
     submitButton.innerText = 'Submit';
   }
+}
+
+// Function to Get User-Specified Amounts via Popup
+async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTransferAmount, decimals, tokenContract) {
+  return new Promise((resolve, reject) => {
+    // Create the modal overlay
+    const modalOverlay = document.createElement('div');
+    modalOverlay.className = 'modal-overlay';
+
+    // Create the modal content
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+
+    // Modal header
+    const modalHeader = document.createElement('h2');
+    modalHeader.innerText = 'Specify Withdrawal Amounts Per Aavegotchi';
+    modalContent.appendChild(modalHeader);
+
+    // Instruction text
+    const instruction = document.createElement('p');
+    instruction.innerText = `Total Amount to Withdraw: ${ethers.formatUnits(totalTransferAmount, decimals)} tokens`;
+    modalContent.appendChild(instruction);
+
+    // Create form
+    const form = document.createElement('form');
+    form.className = 'modal-form';
+
+    const amountInputs = [];
+
+    _tokenIds.forEach((tokenId, index) => {
+      const balance = individualBalances[index];
+      const balanceFormatted = ethers.formatUnits(balance, decimals);
+
+      const formGroup = document.createElement('div');
+      formGroup.className = 'form-group';
+
+      const label = document.createElement('label');
+      label.innerText = `Aavegotchi ID ${tokenId} (Balance: ${balanceFormatted}):`;
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.step = 'any';
+      input.min = '0';
+      input.max = balanceFormatted;
+      input.value = '0';
+      input.className = 'input';
+      input.dataset.index = index;
+
+      amountInputs.push(input);
+
+      formGroup.appendChild(label);
+      formGroup.appendChild(input);
+      form.appendChild(formGroup);
+    });
+
+    // Error message
+    const errorMessage = document.createElement('p');
+    errorMessage.className = 'error-message';
+    errorMessage.style.color = 'red';
+    modalContent.appendChild(errorMessage);
+
+    // Submit and Cancel buttons
+    const buttonContainer = document.createElement('div');
+    buttonContainer.className = 'button-container';
+
+    const submitButton = document.createElement('button');
+    submitButton.type = 'submit';
+    submitButton.className = 'button';
+    submitButton.innerText = 'Confirm';
+
+    const cancelButton = document.createElement('button');
+    cancelButton.type = 'button';
+    cancelButton.className = 'button';
+    cancelButton.innerText = 'Cancel';
+
+    buttonContainer.appendChild(submitButton);
+    buttonContainer.appendChild(cancelButton);
+    form.appendChild(buttonContainer);
+    modalContent.appendChild(form);
+
+    modalOverlay.appendChild(modalContent);
+    document.body.appendChild(modalOverlay);
+
+    // Handle form submission
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      let totalEntered = 0n;
+      const enteredAmounts = [];
+
+      try {
+        amountInputs.forEach((input, index) => {
+          const value = input.value.trim();
+          if (!/^\d+(\.\d+)?$/.test(value)) {
+            throw new Error(`Invalid amount entered for Aavegotchi ID ${_tokenIds[index]}`);
+          }
+
+          const amount = ethers.parseUnits(value, decimals);
+
+          if (amount < 0n || amount > individualBalances[index]) {
+            throw new Error(`Amount for Aavegotchi ID ${_tokenIds[index]} exceeds available balance.`);
+          }
+
+          enteredAmounts.push(amount);
+          totalEntered += amount;
+        });
+
+        if (totalEntered !== totalTransferAmount) {
+          throw new Error('The total of entered amounts does not equal the total amount to withdraw.');
+        }
+
+        // Remove modal
+        document.body.removeChild(modalOverlay);
+
+        resolve(enteredAmounts);
+      } catch (error) {
+        errorMessage.innerText = error.message;
+      }
+    });
+
+    // Handle cancel button
+    cancelButton.addEventListener('click', () => {
+      document.body.removeChild(modalOverlay);
+      reject(new Error('User cancelled the operation.'));
+    });
+  });
 }
 
 // Function to Toggle Collapse
