@@ -454,7 +454,7 @@ a:hover {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(255, 255, 255, 0.75);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -462,12 +462,38 @@ a:hover {
 }
 
 .modal-content {
-  background: #fff;
+  background: #7a4dad;
   padding: 20px;
   border-radius: var(--border-radius);
   width: 90%;
   max-width: 600px;
   color: #000;
+  position: relative;
+}
+
+.modal-content h2 {
+  margin-top: 0;
+  font-size: 22px;
+  margin-bottom: 10px;
+}
+
+.modal-content .instruction {
+  margin-bottom: 20px;
+  font-size: 16px;
+}
+
+.modal-content .total-display {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
+
+.total-display.correct {
+  color: #28a745; /* Green */
+}
+
+.total-display.incorrect {
+  color: #dc3545; /* Red */
 }
 
 .modal-form .form-group {
@@ -487,11 +513,6 @@ a:hover {
   gap: 10px;
 }
 
-.modal-content h2 {
-  margin-top: 0;
-  font-size: 22px;
-}
-
 .modal-content p {
   margin-bottom: 15px;
 }
@@ -500,10 +521,6 @@ a:hover {
   padding: 10px 20px;
   font-size: 16px;
   cursor: pointer;
-}
-
-.error-message {
-  margin-top: 10px;
 }
 
 /* Responsive Table */
@@ -653,5 +670,34 @@ a:hover {
   .aavegotchi-table th,
   .aavegotchi-table td {
     font-size: 14px;
+  }
+}
+
+@media (max-width: 600px) {
+  .aavegotchi-table th,
+  .aavegotchi-table td {
+    padding: 5px;
+    font-size: 12px;
+  }
+
+  .aavegotchi-table {
+    width: 100%;
+  }
+
+  .aavegotchi-table th,
+  .aavegotchi-table td {
+    word-break: break-word;
+  }
+
+  header h1 {
+    font-size: 20px;
+  }
+
+  .form-header h3 {
+    font-size: 16px;
+  }
+
+  .aavegotchi-info {
+    max-height: 300px;
   }
 }
