@@ -799,16 +799,10 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
     const modalContent = document.createElement('div');
     modalContent.className = 'modal-content';
 
-    // Modal header
-    const modalHeader = document.createElement('h2');
-    modalHeader.innerText = 'Specify Withdrawal Amounts Per Aavegotchi ensuring the total amount equals';
-    modalContent.appendChild(modalHeader);
-
     // Instruction text with total amount
-    const instruction = document.createElement('p');
-    instruction.className = 'instruction';
+    const modalHeader = document.createElement('h2');
     instruction.innerText = `Specify Withdrawal Amounts Per Aavegotchi ensuring the total amount equals ${ethers.formatUnits(totalTransferAmount, decimals)} ${tokenSymbol}`;
-    modalContent.appendChild(instruction);
+    modalContent.appendChild(modalHeader);
 
     // Total display
     const totalDisplay = document.createElement('div');
