@@ -309,6 +309,38 @@ function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
+// Global Variables for Selected ERC20 Token
+let selectedERC20Address = ghstContractAddress; // Default to GHST
+let selectedERC20Symbol = 'GHST';
+let selectedERC20Decimals = 18;
+
+// Function to Update Selected ERC20 Token
+async function updateSelectedERC20Token(address) {
+  if (!ethers.isAddress(address)) {
+    showToast('Invalid ERC20 contract address.', 'error');
+    return;
+  }
+
+  try {
+    const tokenContract = new ethers.Contract(address, ghstABI, provider);
+    selectedERC20Symbol = await tokenContract.symbol();
+    selectedERC20Decimals = await tokenContract.decimals();
+    selectedERC20Address = address;
+
+    // Update the table header
+    const tableHeader = document.querySelector('.aavegotchi-table th:nth-child(4)');
+    if (tableHeader) {
+      tableHeader.innerText = `${selectedERC20Symbol} Balance`;
+    }
+
+    // Refresh the table balances
+    await refreshTableBalances();
+  } catch (error) {
+    console.error('Error fetching ERC20 token details:', error);
+    showToast('Failed to fetch ERC20 token details. Ensure the address is correct and the token follows the ERC20 standard.', 'error');
+  }
+}
+
 // Function to Generate Method Forms
 function generateMethodForms() {
   methodFormsContainer.innerHTML = '';
@@ -449,7 +481,19 @@ function generateMethodForms() {
         inputElement.addEventListener('change', async (e) => {
           customInput.style.display = e.target.value === 'custom' ? 'block' : 'none';
           await updateMaxButton(form);
+          // Update the selected ERC20 token for the table
+          if (e.target.value !== 'custom') {
+            await updateSelectedERC20Token(e.target.value);
+          } else {
+            const customAddress = customInput.value.trim();
+            if (ethers.isAddress(customAddress)) {
+              await updateSelectedERC20Token(customAddress);
+            }
+          }
         });
+
+        // Initial update for default selection
+        await updateSelectedERC20Token(inputElement.value);
       } else if (input.name === '_transferAmount') {
         inputElement = document.createElement('input');
         inputElement.type = 'text';
@@ -802,6 +846,10 @@ async function handleFormSubmit(event) {
     showToast(`Transaction submitted. Hash: ${tx.hash}`, 'success');
     await tx.wait();
     showToast('Transaction confirmed!', 'success');
+
+    // Refresh Aavegotchi data after transaction
+    await fetchAndDisplayAavegotchis(userAddress);
+    generateMethodForms();
   } catch (error) {
     console.error(error);
     showToast(`Error: ${error.info?.error?.message || error.message}`, 'error');
@@ -821,11 +869,6 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
     // Create the modal content
     const modalContent = document.createElement('div');
     modalContent.className = 'modal-content';
-
-    // Modal header
-    const modalHeader = document.createElement('h2');
-    modalHeader.innerText = 'Specify Withdrawal Amounts Per Aavegotchi';
-    modalContent.appendChild(modalHeader);
 
     // Instruction text with total amount and token symbol
     const instruction = document.createElement('p');
@@ -1014,8 +1057,9 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       return;
     }
 
-    const ghstDecimals = await ghstContract.decimals();
-    const ghstSymbol = await ghstContract.symbol();
+    const tokenContract = new ethers.Contract(selectedERC20Address, ghstABI, provider);
+    const tokenDecimals = selectedERC20Decimals;
+    const tokenSymbol = selectedERC20Symbol;
 
     const table = document.createElement('table');
     table.className = 'aavegotchi-table';
@@ -1023,7 +1067,7 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
 
-    const headers = ['Token ID', 'Name', 'Escrow Wallet', 'GHST Balance', 'Status'];
+    const headers = ['Token ID', 'Name', 'Escrow Wallet', `${tokenSymbol} Balance`, 'Status'];
     headers.forEach((headerText) => {
       const th = document.createElement('th');
       th.innerText = headerText;
@@ -1039,7 +1083,7 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     const balancePromises = [];
     const lendingStatusPromises = [];
     for (const aavegotchi of aavegotchis) {
-      balancePromises.push(ghstContract.balanceOf(aavegotchi.escrow));
+      balancePromises.push(tokenContract.balanceOf(aavegotchi.escrow));
       lendingStatusPromises.push(contract.isAavegotchiLent(aavegotchi.tokenId));
     }
 
@@ -1063,8 +1107,8 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
 
       // Store escrow balances
       escrowBalances[escrowWallet] = {
-        ghstBalance: balances[index],
-        tokenBalances: {},
+        tokenBalance: balances[index],
+        tokenSymbol: tokenSymbol,
       };
 
       // Token ID Cell
@@ -1101,13 +1145,13 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
 
       row.appendChild(escrowCell);
 
-      // GHST Balance Cell with Token Symbol
-      const ghstBalanceRaw = balances[index];
-      const ghstBalance = ethers.formatUnits(ghstBalanceRaw, ghstDecimals);
-      const ghstBalanceCell = document.createElement('td');
-      ghstBalanceCell.setAttribute('data-label', 'GHST Balance');
-      ghstBalanceCell.innerText = `${ghstBalance} ${ghstSymbol}`;
-      row.appendChild(ghstBalanceCell);
+      // Token Balance Cell with Token Symbol
+      const tokenBalanceRaw = balances[index];
+      const tokenBalance = ethers.formatUnits(tokenBalanceRaw, tokenDecimals);
+      const tokenBalanceCell = document.createElement('td');
+      tokenBalanceCell.setAttribute('data-label', `${tokenSymbol} Balance`);
+      tokenBalanceCell.innerText = `${tokenBalance} ${tokenSymbol}`;
+      row.appendChild(tokenBalanceCell);
 
       // Status Cell
       const statusCell = document.createElement('td');
@@ -1126,7 +1170,7 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
 
     table.appendChild(tbody);
 
-    aavegotchiInfoContainer.innerHTML = '<h2>Your Aavegotchis:</h2>';
+    aavegotchiInfoContainer.innerHTML = `<h2>Your Aavegotchis:</h2>`;
     aavegotchiInfoContainer.appendChild(table);
 
     initializeCopyButtons();
@@ -1265,3 +1309,29 @@ window.onload = async () => {
     await connectWallet();
   }
 };
+
+// Function to Refresh Table Balances Based on Selected ERC20 Token
+async function refreshTableBalances() {
+  try {
+    const rows = document.querySelectorAll('.aavegotchi-table tbody tr');
+    const tokenContract = new ethers.Contract(selectedERC20Address, ghstABI, provider);
+
+    // Fetch all balances in parallel
+    const balancePromises = Array.from(rows).map((row) => {
+      const escrowWallet = row.querySelector('td:nth-child(3) a').getAttribute('title');
+      return tokenContract.balanceOf(escrowWallet);
+    });
+
+    const balances = await Promise.all(balancePromises);
+
+    // Update each row's balance cell
+    rows.forEach((row, index) => {
+      const balanceCell = row.querySelector(`td:nth-child(4)`);
+      const formattedBalance = ethers.formatUnits(balances[index], selectedERC20Decimals);
+      balanceCell.innerText = `${formattedBalance} ${selectedERC20Symbol}`;
+    });
+  } catch (error) {
+    console.error('Error refreshing table balances:', error);
+    showToast('Failed to refresh token balances.', 'error');
+  }
+}
