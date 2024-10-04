@@ -2,7 +2,7 @@
 
 // Ensure ethers.js version 6.13.2 is used
 // Included in your HTML with SRI:
-// <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js" integrity="sha384-gpR0Q6Hx/O+uevlbpbANbS0LWjbejPV1sqD/8w422l/fW8whGY0EPmKw3uG7ACYP" crossorigin="anonymous"></script>
+// <script src="https://cdnjs.cloudflare.com/ajax/ajax/libs/ethers/6.13.2/ethers.umd.min.js" integrity="sha384-gpR0Q6Hx/O+uevlbpbANbS0LWjbejPV1sqD/8w422l/fW8whGY0EPmKw3uG7ACYP" crossorigin="anonymous"></script>
 
 // Contract Information
 const contractAddress = '0x86935F11C86623deC8a25696E1C19a8659CbF95d';
@@ -360,7 +360,6 @@ async function generateMethodForms() { // Declared as async
   const mainMethodNames = ['transferEscrow'];
   const extraMethodNames = ['batchTransferEscrow', 'batchDepositERC20', 'batchDepositGHST', 'depositERC20'];
 
-  // Replace forEach with for...of to handle async/await correctly
   for (const methodName of mainMethodNames) {
     const method = facetMethods[methodName];
     const formContainer = document.createElement('div');
@@ -378,12 +377,7 @@ async function generateMethodForms() { // Declared as async
     form.setAttribute('data-method', methodName);
     form.addEventListener('submit', handleFormSubmit);
 
-    // Include _tokenId in the inputs
     for (const input of method.inputs) {
-      if (methodName === 'transferEscrow' && input.name === '_recipient') {
-        continue;
-      }
-
       const formGroup = document.createElement('div');
       formGroup.className = 'form-group';
 
@@ -398,7 +392,6 @@ async function generateMethodForms() { // Declared as async
         } else if (input.name === '_transferAmount') {
           label.innerText = 'Withdraw Amount:';
 
-          // Create Max button and append to label
           const maxButton = document.createElement('button');
           maxButton.type = 'button';
           maxButton.className = 'max-button';
@@ -418,7 +411,6 @@ async function generateMethodForms() { // Declared as async
 
       let inputElement;
       if (input.name === '_tokenId') {
-        // Create a dropdown for owned Aavegotchis
         inputElement = document.createElement('select');
         inputElement.className = 'select';
         inputElement.id = input.name;
@@ -447,8 +439,6 @@ async function generateMethodForms() { // Declared as async
         }
 
         formGroup.appendChild(inputElement);
-
-        // Add event listener to update Max button when selection changes
         inputElement.addEventListener('change', () => updateMaxButton(form));
       } else if (methodName === 'transferEscrow' && input.name === '_erc20Contract') {
         inputElement = document.createElement('select');
@@ -479,11 +469,15 @@ async function generateMethodForms() { // Declared as async
         customInput.style.display = 'none';
         formGroup.appendChild(customInput);
 
-        // Remove immediate validation from 'change' event
-        // and add an 'input' event listener instead
         inputElement.addEventListener('change', async (e) => {
           const isCustom = e.target.value === 'custom';
           customInput.style.display = isCustom ? 'block' : 'none';
+          
+          // Clear the field when switching tokens
+          if (!isCustom) {
+            customInput.value = ''; // Clear the custom input field
+          }
+
           await updateMaxButton(form);
 
           if (!isCustom) {
@@ -491,22 +485,18 @@ async function generateMethodForms() { // Declared as async
           }
         });
 
-        // Add 'input' event listener to customInput for validation
         customInput.addEventListener('input', async (e) => {
           const customAddress = e.target.value.trim();
           if (customAddress === '') {
-            // Do not validate yet
             selectedERC20Address = null;
             selectedERC20Symbol = '';
             selectedERC20Decimals = 18;
 
-            // Update the table header to indicate no token selected
             const tableHeader = document.querySelector('.aavegotchi-table th:nth-child(4)');
             if (tableHeader) {
               tableHeader.innerText = `Token Balance`;
             }
 
-            // Refresh the table
             await refreshTableBalances();
             return;
           }
@@ -517,7 +507,6 @@ async function generateMethodForms() { // Declared as async
           }
         });
 
-        // Initial update for default selection
         await updateSelectedERC20Token(inputElement.value);
       } else if (input.name === '_transferAmount') {
         inputElement = document.createElement('input');
@@ -557,14 +546,10 @@ async function generateMethodForms() { // Declared as async
     formContainer.appendChild(form);
     methodFormsContainer.appendChild(formContainer);
 
-    // Add event listeners for updating Max button when selections change
     form.addEventListener('change', () => updateMaxButton(form));
-
-    // Call updateMaxButton to initialize the Max button
     updateMaxButton(form);
   }
 
-  // Include code for extra tools
   generateExtraTools(facetMethods, extraMethodNames);
 }
 
@@ -717,7 +702,6 @@ function getFacetMethods(facet) {
         ],
       },
     },
-    // Add other facets if needed
   };
 
   return facets[facet];
@@ -751,28 +735,21 @@ async function handleFormSubmit(event) {
       erc20ContractAddress = customAddress;
     }
 
-    // Handle Amount
     let transferAmountValue = formData.get('_transferAmount')?.trim();
-
-    // Ensure leading zero for decimal inputs
     if (transferAmountValue && transferAmountValue.startsWith('.')) {
       transferAmountValue = '0' + transferAmountValue;
     }
 
     if (methodName === 'transferEscrow' && tokenIdValue === 'all') {
-      // Switch to batchTransferEscrow
       methodName = 'batchTransferEscrow';
       method = facetMethods[methodName];
 
-      // Prepare arguments
       let _tokenIds = ownedAavegotchis.map((gotchi) => ethers.getBigInt(gotchi.tokenId));
 
-      // Validate ownership
       if (_tokenIds.length === 0) {
         throw new Error('You do not own any Aavegotchis.');
       }
 
-      // Filter Aavegotchis with positive balance of the selected token
       const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
       const balancePromises = _tokenIds.map(async (tokenId) => {
         const gotchi = ownedAavegotchis.find((g) => ethers.getBigInt(g.tokenId) === tokenId);
@@ -789,7 +766,6 @@ async function handleFormSubmit(event) {
         throw new Error('None of your Aavegotchis hold the selected token.');
       }
 
-      // Prepare filtered arrays
       _tokenIds = filteredData.map(({ tokenId }) => tokenId);
       const individualBalances = filteredData.map(({ balance }) => balance);
       const totalAvailableBalance = individualBalances.reduce((acc, balance) => acc + balance, 0n);
@@ -812,10 +788,8 @@ async function handleFormSubmit(event) {
       let _transferAmounts = [];
 
       if (totalTransferAmount === totalAvailableBalance) {
-        // Use individual balances as transfer amounts
         _transferAmounts = individualBalances;
       } else {
-        // Show popup for user to specify amounts per Aavegotchi
         _transferAmounts = await getUserSpecifiedAmounts(
           filteredData.map((data) => data.tokenId),
           filteredData.map((data) => data.balance),
@@ -828,29 +802,22 @@ async function handleFormSubmit(event) {
       }
 
       args.push(_tokenIds);
-
-      // Prepare _erc20Contracts array
       const _erc20Contracts = _tokenIds.map(() => erc20ContractAddress);
       args.push(_erc20Contracts);
-
-      // Prepare _recipients array
       const _recipients = _tokenIds.map(() => userAddress);
       args.push(_recipients);
-
       args.push(_transferAmounts);
     } else {
-      // Single Aavegotchi
       const _tokenId = ethers.getBigInt(tokenIdValue);
       args.push(_tokenId);
 
-      // Validate ownership
       const ownedTokenIds = ownedAavegotchis.map((gotchi) => gotchi.tokenId.toString());
       if (!ownedTokenIds.includes(_tokenId.toString())) {
         throw new Error('You do not own the selected Aavegotchi.');
       }
 
       args.push(erc20ContractAddress);
-      args.push(userAddress); // _recipient
+      args.push(userAddress);
 
       if (transferAmountValue === '') {
         throw new Error('Please enter an amount or click Max.');
@@ -872,9 +839,8 @@ async function handleFormSubmit(event) {
     await tx.wait();
     showToast('Transaction confirmed!', 'success');
 
-    // Refresh Aavegotchi data after transaction
     await fetchAndDisplayAavegotchis(userAddress);
-    await generateMethodForms(); // Await the async function
+    await generateMethodForms();
   } catch (error) {
     console.error(error);
     showToast(`Error: ${error.info?.error?.message || error.message}`, 'error');
@@ -887,27 +853,22 @@ async function handleFormSubmit(event) {
 // Function to Get User-Specified Amounts via Popup
 async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTransferAmount, decimals, tokenContract, aavegotchiNames, tokenSymbol) {
   return new Promise((resolve, reject) => {
-    // Create the modal overlay
     const modalOverlay = document.createElement('div');
     modalOverlay.className = 'modal-overlay';
 
-    // Create the modal content
     const modalContent = document.createElement('div');
     modalContent.className = 'modal-content';
 
-    // Instruction text with total amount and token symbol
     const instruction = document.createElement('p');
     instruction.className = 'instruction';
     instruction.innerText = `Specify Withdrawal Amounts Per Aavegotchi ensuring the total amount equals ${ethers.formatUnits(totalTransferAmount, decimals)} ${tokenSymbol}`;
     modalContent.appendChild(instruction);
 
-    // Total display
     const totalDisplay = document.createElement('div');
     totalDisplay.className = 'total-display incorrect';
     totalDisplay.innerText = `Total Entered: 0.0 ${tokenSymbol}`;
     modalContent.appendChild(totalDisplay);
 
-    // Create form
     const form = document.createElement('form');
     form.className = 'modal-form';
 
@@ -941,13 +902,11 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
       form.appendChild(formGroup);
     }
 
-    // Error message
     const errorMessage = document.createElement('p');
     errorMessage.className = 'error-message';
     errorMessage.style.color = 'red';
     modalContent.appendChild(errorMessage);
 
-    // Submit and Cancel buttons
     const buttonContainer = document.createElement('div');
     buttonContainer.className = 'button-container';
 
@@ -969,7 +928,6 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
     modalOverlay.appendChild(modalContent);
     document.body.appendChild(modalOverlay);
 
-    // Function to update total
     const updateTotal = () => {
       let totalEntered = 0n;
       for (const input of amountInputs) {
@@ -992,13 +950,10 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
       }
     };
 
-    // Initial total calculation
     updateTotal();
 
-    // Add event listeners to inputs for dynamic total calculation
     for (const input of amountInputs) {
       input.addEventListener('input', updateTotal);
-      // Ensure leading zero for decimal inputs
       input.addEventListener('blur', () => {
         if (input.value.startsWith('.')) {
           input.value = '0' + input.value;
@@ -1007,7 +962,6 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
       });
     }
 
-    // Handle form submission
     form.addEventListener('submit', (e) => {
       e.preventDefault();
 
@@ -1018,7 +972,6 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
         for (let index = 0; index < amountInputs.length; index++) {
           const input = amountInputs[index];
           let value = input.value.trim();
-          // Ensure leading zero for decimal inputs
           if (value.startsWith('.')) {
             value = '0' + value;
             input.value = value;
@@ -1042,7 +995,6 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
           throw new Error('The total of entered amounts does not equal the total amount to withdraw.');
         }
 
-        // Remove modal
         document.body.removeChild(modalOverlay);
 
         resolve(enteredAmounts);
@@ -1051,7 +1003,6 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
       }
     });
 
-    // Handle cancel button
     cancelButton.addEventListener('click', () => {
       document.body.removeChild(modalOverlay);
       reject(new Error('User cancelled the operation.'));
@@ -1077,7 +1028,7 @@ function toggleCollapse(contentElement, iconElement, expand) {
 // Function to Fetch and Display Aavegotchis
 async function fetchAndDisplayAavegotchis(ownerAddress) {
   try {
-    ownedAavegotchis = []; // Reset owned Aavegotchis
+    ownedAavegotchis = []; 
     const aavegotchis = await contract.allAavegotchisOfOwner(ownerAddress);
 
     if (aavegotchis.length === 0) {
@@ -1107,7 +1058,6 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
 
     const tbody = document.createElement('tbody');
 
-    // Fetch balances and lending status in parallel
     const balancePromises = [];
     const lendingStatusPromises = [];
     for (const aavegotchi of aavegotchis) {
@@ -1134,25 +1084,21 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       const escrowWallet = aavegotchi.escrow;
       const shortEscrowWallet = `${escrowWallet.slice(0, 6)}...${escrowWallet.slice(-4)}`;
 
-      // Store escrow balances
       escrowBalances[escrowWallet] = {
         tokenBalance: balances[index],
         tokenSymbol: tokenSymbol,
       };
 
-      // Token ID Cell
       const tokenIdCell = document.createElement('td');
       tokenIdCell.setAttribute('data-label', 'Token ID');
       tokenIdCell.innerText = tokenId;
       row.appendChild(tokenIdCell);
 
-      // Name Cell
       const nameCell = document.createElement('td');
       nameCell.setAttribute('data-label', 'Name');
       nameCell.innerText = name;
       row.appendChild(nameCell);
 
-      // Escrow Wallet Cell
       const escrowCell = document.createElement('td');
       escrowCell.setAttribute('data-label', 'Escrow Wallet');
       const escrowLink = document.createElement('a');
@@ -1164,7 +1110,6 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       escrowLink.innerText = shortEscrowWallet;
       escrowCell.appendChild(escrowLink);
 
-      // Add copy button
       const copyButton = document.createElement('button');
       copyButton.className = 'copy-button';
       copyButton.setAttribute('data-copy-target', escrowWallet);
@@ -1174,7 +1119,6 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
 
       row.appendChild(escrowCell);
 
-      // Token Balance Cell with Token Symbol
       const tokenBalanceRaw = balances[index];
       const tokenBalance = ethers.formatUnits(tokenBalanceRaw, tokenDecimals);
       const tokenBalanceCell = document.createElement('td');
@@ -1182,7 +1126,6 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       tokenBalanceCell.innerText = `${tokenBalance} ${tokenSymbol}`;
       row.appendChild(tokenBalanceCell);
 
-      // Status Cell
       const statusCell = document.createElement('td');
       statusCell.setAttribute('data-label', 'Status');
       if (isOwned) {
@@ -1255,7 +1198,6 @@ async function updateMaxButton(form) {
 
   if (!tokenIdValue || !amountInput || !maxButton) return;
 
-  // Disable Max button until balances are fetched
   maxButton.disabled = true;
   maxButton.innerText = 'Loading...';
 
@@ -1272,7 +1214,6 @@ async function updateMaxButton(form) {
 
       const balances = await Promise.all(balancePromises);
 
-      // Filter out Aavegotchis with zero balance
       const filteredBalances = balances.filter((balance) => balance > 0n);
 
       if (filteredBalances.length === 0) {
@@ -1286,10 +1227,7 @@ async function updateMaxButton(form) {
         totalBalance += balance;
       }
 
-      // Store individual balances for batch transfer
       maxButton.dataset.maxValue = totalBalance.toString();
-
-      // Do not set amountInput.value here
     } else {
       const gotchi = ownedAavegotchis.find((g) => g.tokenId.toString() === tokenIdValue);
       if (!gotchi) throw new Error('Selected Aavegotchi not found.');
@@ -1345,7 +1283,6 @@ async function refreshTableBalances() {
     const rows = document.querySelectorAll('.aavegotchi-table tbody tr');
     const tokenContract = new ethers.Contract(selectedERC20Address, ghstABI, provider);
 
-    // Fetch all balances in parallel
     const balancePromises = Array.from(rows).map((row) => {
       const escrowWallet = row.querySelector('td:nth-child(3) a').getAttribute('title');
       return tokenContract.balanceOf(escrowWallet);
@@ -1353,10 +1290,9 @@ async function refreshTableBalances() {
 
     const balances = await Promise.all(balancePromises);
 
-    // Update each row's balance cell
     for (let index = 0; index < rows.length; index++) {
       const row = rows[index];
-      const balanceCell = row.querySelector(`td:nth-child(4)`);
+      const balanceCell = row.querySelector('td:nth-child(4)');
       const formattedBalance = ethers.formatUnits(balances[index], selectedERC20Decimals);
       balanceCell.innerText = `${formattedBalance} ${selectedERC20Symbol}`;
     }
