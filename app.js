@@ -264,7 +264,7 @@ async function connectWallet() {
     connectWalletButton.innerText = `Connected: ${shortAddress}`;
 
     await fetchAndDisplayAavegotchis(address);
-    generateMethodForms(); // Generate forms after fetching Aavegotchis
+    await generateMethodForms(); // Generate forms after fetching Aavegotchis
 
     window.ethereum.on('accountsChanged', handleAccountsChanged);
     window.ethereum.on('chainChanged', handleChainChanged);
@@ -342,7 +342,7 @@ async function updateSelectedERC20Token(address) {
 }
 
 // Function to Generate Method Forms
-async function generateMethodForms() {
+async function generateMethodForms() { // Declared as async
   methodFormsContainer.innerHTML = '';
   if (!contract) {
     methodFormsContainer.innerHTML = '<p>Please connect your wallet to interact with the contract.</p>';
@@ -851,7 +851,7 @@ async function handleFormSubmit(event) {
 
     // Refresh Aavegotchi data after transaction
     await fetchAndDisplayAavegotchis(userAddress);
-    generateMethodForms();
+    await generateMethodForms(); // Await the async function
   } catch (error) {
     console.error(error);
     showToast(`Error: ${error.info?.error?.message || error.message}`, 'error');
