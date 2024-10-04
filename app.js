@@ -360,7 +360,8 @@ async function generateMethodForms() { // Declared as async
   const mainMethodNames = ['transferEscrow'];
   const extraMethodNames = ['batchTransferEscrow', 'batchDepositERC20', 'batchDepositGHST', 'depositERC20'];
 
-  mainMethodNames.forEach((methodName) => {
+  // Replace forEach with for...of to handle async/await correctly
+  for (const methodName of mainMethodNames) {
     const method = facetMethods[methodName];
     const formContainer = document.createElement('div');
     formContainer.className = 'form-container';
@@ -378,9 +379,9 @@ async function generateMethodForms() { // Declared as async
     form.addEventListener('submit', handleFormSubmit);
 
     // Include _tokenId in the inputs
-    method.inputs.forEach((input) => {
+    for (const input of method.inputs) {
       if (methodName === 'transferEscrow' && input.name === '_recipient') {
-        return;
+        continue;
       }
 
       const formGroup = document.createElement('div');
@@ -430,12 +431,12 @@ async function generateMethodForms() { // Declared as async
           inputElement.appendChild(allOption);
         }
 
-        ownedAavegotchis.forEach((aavegotchi) => {
+        for (const aavegotchi of ownedAavegotchis) {
           const option = document.createElement('option');
           option.value = aavegotchi.tokenId.toString();
           option.innerText = `Aavegotchi ID ${aavegotchi.tokenId} (${aavegotchi.name})`;
           inputElement.appendChild(option);
-        });
+        }
 
         if (ownedAavegotchis.length === 0) {
           const option = document.createElement('option');
@@ -455,12 +456,12 @@ async function generateMethodForms() { // Declared as async
         inputElement.id = input.name;
         inputElement.name = input.name;
 
-        predefinedTokens.forEach((token) => {
+        for (const token of predefinedTokens) {
           const option = document.createElement('option');
           option.value = token.address;
           option.innerText = token.name;
           inputElement.appendChild(option);
-        });
+        }
 
         const customOption = document.createElement('option');
         customOption.value = 'custom';
@@ -523,7 +524,7 @@ async function generateMethodForms() { // Declared as async
       }
 
       form.appendChild(formGroup);
-    });
+    }
 
     const submitButton = document.createElement('button');
     submitButton.type = 'submit';
@@ -539,7 +540,7 @@ async function generateMethodForms() { // Declared as async
 
     // Call updateMaxButton to initialize the Max button
     updateMaxButton(form);
-  });
+  }
 
   // Include code for extra tools
   generateExtraTools(facetMethods, extraMethodNames);
@@ -595,7 +596,7 @@ function generateExtraTools(facetMethods, extraMethodNames) {
       form.setAttribute('data-method', methodName);
       form.addEventListener('submit', handleFormSubmit);
 
-      method.inputs.forEach((input) => {
+      for (const input of method.inputs) {
         const formGroup = document.createElement('div');
         formGroup.className = 'form-group';
 
@@ -623,7 +624,7 @@ function generateExtraTools(facetMethods, extraMethodNames) {
         inputElement.name = input.name;
         formGroup.appendChild(inputElement);
         form.appendChild(formGroup);
-      });
+      }
 
       const submitButton = document.createElement('button');
       submitButton.type = 'submit';
@@ -890,7 +891,8 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
 
     const amountInputs = [];
 
-    _tokenIds.forEach((tokenId, index) => {
+    for (let index = 0; index < _tokenIds.length; index++) {
+      const tokenId = _tokenIds[index];
       const balance = individualBalances[index];
       const balanceFormatted = ethers.formatUnits(balance, decimals);
       const aavegotchiName = aavegotchiNames[index] || 'Unnamed';
@@ -915,7 +917,7 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
       formGroup.appendChild(label);
       formGroup.appendChild(input);
       form.appendChild(formGroup);
-    });
+    }
 
     // Error message
     const errorMessage = document.createElement('p');
@@ -948,13 +950,13 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
     // Function to update total
     const updateTotal = () => {
       let totalEntered = 0n;
-      amountInputs.forEach((input, index) => {
+      for (const input of amountInputs) {
         const value = input.value.trim();
         if (/^\d+(\.\d+)?$/.test(value)) {
           const amount = ethers.parseUnits(value, decimals);
           totalEntered += amount;
         }
-      });
+      }
 
       const formattedTotal = ethers.formatUnits(totalEntered, decimals);
       totalDisplay.innerText = `Total Entered: ${formattedTotal} ${tokenSymbol}`;
@@ -972,7 +974,7 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
     updateTotal();
 
     // Add event listeners to inputs for dynamic total calculation
-    amountInputs.forEach((input) => {
+    for (const input of amountInputs) {
       input.addEventListener('input', updateTotal);
       // Ensure leading zero for decimal inputs
       input.addEventListener('blur', () => {
@@ -981,7 +983,7 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
           updateTotal();
         }
       });
-    });
+    }
 
     // Handle form submission
     form.addEventListener('submit', (e) => {
@@ -991,7 +993,8 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
       const enteredAmounts = [];
 
       try {
-        amountInputs.forEach((input, index) => {
+        for (let index = 0; index < amountInputs.length; index++) {
+          const input = amountInputs[index];
           let value = input.value.trim();
           // Ensure leading zero for decimal inputs
           if (value.startsWith('.')) {
@@ -1011,7 +1014,7 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
 
           enteredAmounts.push(amount);
           totalEntered += amount;
-        });
+        }
 
         if (totalEntered !== totalTransferAmount) {
           throw new Error('The total of entered amounts does not equal the total amount to withdraw.');
@@ -1071,11 +1074,11 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     const headerRow = document.createElement('tr');
 
     const headers = ['Token ID', 'Name', 'Escrow Wallet', `${tokenSymbol} Balance`, 'Status'];
-    headers.forEach((headerText) => {
+    for (const headerText of headers) {
       const th = document.createElement('th');
       th.innerText = headerText;
       headerRow.appendChild(th);
-    });
+    }
 
     thead.appendChild(headerRow);
     table.appendChild(thead);
@@ -1093,7 +1096,8 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     const balances = await Promise.all(balancePromises);
     const lendingStatuses = await Promise.all(lendingStatusPromises);
 
-    aavegotchis.forEach((aavegotchi, index) => {
+    for (let index = 0; index < aavegotchis.length; index++) {
+      const aavegotchi = aavegotchis[index];
       const isLent = lendingStatuses[index];
       const isOwned = !isLent;
 
@@ -1169,7 +1173,7 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       row.appendChild(statusCell);
 
       tbody.appendChild(row);
-    });
+    }
 
     table.appendChild(tbody);
 
@@ -1256,9 +1260,9 @@ async function updateMaxButton(form) {
         return;
       }
 
-      filteredBalances.forEach((balance) => {
+      for (const balance of filteredBalances) {
         totalBalance += balance;
-      });
+      }
 
       // Store individual balances for batch transfer
       maxButton.dataset.maxValue = totalBalance.toString();
@@ -1328,11 +1332,12 @@ async function refreshTableBalances() {
     const balances = await Promise.all(balancePromises);
 
     // Update each row's balance cell
-    rows.forEach((row, index) => {
+    for (let index = 0; index < rows.length; index++) {
+      const row = rows[index];
       const balanceCell = row.querySelector(`td:nth-child(4)`);
       const formattedBalance = ethers.formatUnits(balances[index], selectedERC20Decimals);
       balanceCell.innerText = `${formattedBalance} ${selectedERC20Symbol}`;
-    });
+    }
   } catch (error) {
     console.error('Error refreshing table balances:', error);
     showToast('Failed to refresh token balances.', 'error');
