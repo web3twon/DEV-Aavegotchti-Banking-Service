@@ -479,19 +479,41 @@ async function generateMethodForms() { // Declared as async
         customInput.style.display = 'none';
         formGroup.appendChild(customInput);
 
+        // Remove immediate validation from 'change' event
+        // and add an 'input' event listener instead
         inputElement.addEventListener('change', async (e) => {
-          customInput.style.display = e.target.value === 'custom' ? 'block' : 'none';
+          const isCustom = e.target.value === 'custom';
+          customInput.style.display = isCustom ? 'block' : 'none';
           await updateMaxButton(form);
-          // Update the selected ERC20 token for the table
-          if (e.target.value !== 'custom') {
+
+          if (!isCustom) {
             await updateSelectedERC20Token(e.target.value);
-          } else {
-            const customAddress = customInput.value.trim();
-            if (ethers.isAddress(customAddress)) {
-              await updateSelectedERC20Token(customAddress);
-            } else {
-              showToast('Please enter a valid ERC20 contract address.', 'error');
+          }
+        });
+
+        // Add 'input' event listener to customInput for validation
+        customInput.addEventListener('input', async (e) => {
+          const customAddress = e.target.value.trim();
+          if (customAddress === '') {
+            // Do not validate yet
+            selectedERC20Address = null;
+            selectedERC20Symbol = '';
+            selectedERC20Decimals = 18;
+
+            // Update the table header to indicate no token selected
+            const tableHeader = document.querySelector('.aavegotchi-table th:nth-child(4)');
+            if (tableHeader) {
+              tableHeader.innerText = `Token Balance`;
             }
+
+            // Refresh the table
+            await refreshTableBalances();
+            return;
+          }
+          if (ethers.isAddress(customAddress)) {
+            await updateSelectedERC20Token(customAddress);
+          } else {
+            showToast('Please enter a valid ERC20 contract address.', 'error');
           }
         });
 
