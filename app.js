@@ -493,7 +493,9 @@ function generateMethodForms() {
         });
 
         // Initial update for default selection
-        await updateSelectedERC20Token(inputElement.value);
+        updateSelectedERC20Token(inputElement.value).catch((err) => {
+          console.error('Initial ERC20 token update failed:', err);
+        });
       } else if (input.name === '_transferAmount') {
         inputElement = document.createElement('input');
         inputElement.type = 'text';
@@ -536,7 +538,9 @@ function generateMethodForms() {
     form.addEventListener('change', () => updateMaxButton(form));
 
     // Call updateMaxButton to initialize the Max button
-    updateMaxButton(form);
+    updateMaxButton(form).catch((err) => {
+      console.error('Initial Max button update failed:', err);
+    });
   });
 
   // Include code for extra tools
@@ -1050,6 +1054,7 @@ function toggleCollapse(contentElement, iconElement, expand) {
 // Function to Fetch and Display Aavegotchis
 async function fetchAndDisplayAavegotchis(ownerAddress) {
   try {
+    ownedAavegotchis = []; // Reset owned Aavegotchis
     const aavegotchis = await contract.allAavegotchisOfOwner(ownerAddress);
 
     if (aavegotchis.length === 0) {
