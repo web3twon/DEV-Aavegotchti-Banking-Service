@@ -166,14 +166,40 @@ const walletInfo = document.getElementById('wallet-info');
 const networkNameDisplay = document.getElementById('network-name');
 const methodFormsContainer = document.getElementById('method-forms');
 const aavegotchiInfoContainer = document.getElementById('aavegotchi-info');
+const toastContainer = document.getElementById('toast-container');
 
 // Event Listeners
 connectWalletButton.addEventListener('click', connectWallet);
 
+// Toast Notification Functions
+function showToast(message, type = 'success') {
+  const toast = document.createElement('div');
+  toast.classList.add('toast');
+  toast.classList.add(type === 'success' ? 'toast-success' : 'toast-error');
+  toast.innerText = message;
+
+  const closeButton = document.createElement('button');
+  closeButton.classList.add('toast-close');
+  closeButton.innerHTML = '&times;';
+  closeButton.addEventListener('click', () => {
+    toastContainer.removeChild(toast);
+  });
+
+  toast.appendChild(closeButton);
+  toastContainer.appendChild(toast);
+
+  // Automatically remove the toast after 3 seconds
+  setTimeout(() => {
+    if (toastContainer.contains(toast)) {
+      toastContainer.removeChild(toast);
+    }
+  }, 3000);
+}
+
 // Function to Connect Wallet
 async function connectWallet() {
   if (typeof window.ethereum === 'undefined') {
-    alert('MetaMask is not installed. Please install MetaMask to use this DApp.');
+    showToast('MetaMask is not installed. Please install MetaMask to use this DApp.', 'error');
     return;
   }
 
@@ -211,7 +237,7 @@ async function connectWallet() {
 
     // Enforce network selection
     if (network.chainId !== 137n) {
-      alert('Please switch to the Polygon network in MetaMask.');
+      showToast('Please switch to the Polygon network in MetaMask.', 'error');
       // Optionally, trigger a network switch using MetaMask's API
       try {
         await window.ethereum.request({
@@ -224,9 +250,9 @@ async function connectWallet() {
       } catch (switchError) {
         if (switchError.code === 4902) {
           // The network is not added to MetaMask
-          alert('The Polygon network is not available in your MetaMask. Please add it manually.');
+          showToast('The Polygon network is not available in your MetaMask. Please add it manually.', 'error');
         } else {
-          alert('Failed to switch to the Polygon network. Please switch manually in MetaMask.');
+          showToast('Failed to switch to the Polygon network. Please switch manually in MetaMask.', 'error');
         }
         return;
       }
@@ -245,7 +271,7 @@ async function connectWallet() {
     initializeCopyButtons();
   } catch (error) {
     console.error('Error connecting wallet:', error);
-    alert('Failed to connect wallet. See console for details.');
+    showToast('Failed to connect wallet. See console for details.', 'error');
   }
 }
 
@@ -657,8 +683,12 @@ async function handleFormSubmit(event) {
     }
 
     // Handle Amount
-    const amountInput = form.querySelector('input[name="_transferAmount"]');
-    let transferAmountValue = amountInput.value.trim();
+    let transferAmountValue = formData.get('_transferAmount')?.trim();
+
+    // Ensure leading zero for decimal inputs
+    if (transferAmountValue && transferAmountValue.startsWith('.')) {
+      transferAmountValue = '0' + transferAmountValue;
+    }
 
     if (methodName === 'transferEscrow' && tokenIdValue === 'all') {
       // Switch to batchTransferEscrow
@@ -723,7 +753,8 @@ async function handleFormSubmit(event) {
           totalTransferAmount,
           decimals,
           tokenContract,
-          filteredData.map((data) => data.name)
+          filteredData.map((data) => data.name),
+          await tokenContract.symbol()
         );
       }
 
@@ -768,12 +799,12 @@ async function handleFormSubmit(event) {
     }
 
     const tx = await contract[methodName](...args);
-    alert(`Transaction submitted. Hash: ${tx.hash}`);
+    showToast(`Transaction submitted. Hash: ${tx.hash}`, 'success');
     await tx.wait();
-    alert('Transaction confirmed!');
+    showToast('Transaction confirmed!', 'success');
   } catch (error) {
     console.error(error);
-    alert(`Error: ${error.info?.error?.message || error.message}`);
+    showToast(`Error: ${error.info?.error?.message || error.message}`, 'error');
   } finally {
     submitButton.disabled = false;
     submitButton.innerText = 'Submit';
@@ -781,7 +812,7 @@ async function handleFormSubmit(event) {
 }
 
 // Function to Get User-Specified Amounts via Popup
-async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTransferAmount, decimals, tokenContract, aavegotchiNames) {
+async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTransferAmount, decimals, tokenContract, aavegotchiNames, tokenSymbol) {
   return new Promise((resolve, reject) => {
     // Create the modal overlay
     const modalOverlay = document.createElement('div');
@@ -796,16 +827,16 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
     modalHeader.innerText = 'Specify Withdrawal Amounts Per Aavegotchi';
     modalContent.appendChild(modalHeader);
 
-    // Instruction text with total amount
+    // Instruction text with total amount and token symbol
     const instruction = document.createElement('p');
     instruction.className = 'instruction';
-    instruction.innerText = `Specify Withdrawal Amounts Per Aavegotchi ensuring the total amount equals ${ethers.formatUnits(totalTransferAmount, decimals)} tokens`;
+    instruction.innerText = `Specify Withdrawal Amounts Per Aavegotchi ensuring the total amount equals ${ethers.formatUnits(totalTransferAmount, decimals)} ${tokenSymbol}`;
     modalContent.appendChild(instruction);
 
     // Total display
     const totalDisplay = document.createElement('div');
     totalDisplay.className = 'total-display incorrect';
-    totalDisplay.innerText = `Total Entered: 0.0`;
+    totalDisplay.innerText = `Total Entered: 0.0 ${tokenSymbol}`;
     modalContent.appendChild(totalDisplay);
 
     // Create form
@@ -823,7 +854,7 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
       formGroup.className = 'form-group';
 
       const label = document.createElement('label');
-      label.innerText = `Aavegotchi ID ${tokenId} (${aavegotchiName}) (Balance: ${balanceFormatted}):`;
+      label.innerText = `Aavegotchi ID ${tokenId} (${aavegotchiName}) (Balance: ${balanceFormatted} ${tokenSymbol}):`;
 
       const input = document.createElement('input');
       input.type = 'number';
@@ -881,7 +912,7 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
       });
 
       const formattedTotal = ethers.formatUnits(totalEntered, decimals);
-      totalDisplay.innerText = `Total Entered: ${formattedTotal}`;
+      totalDisplay.innerText = `Total Entered: ${formattedTotal} ${tokenSymbol}`;
 
       if (totalEntered === totalTransferAmount) {
         totalDisplay.classList.remove('incorrect');
@@ -898,6 +929,13 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
     // Add event listeners to inputs for dynamic total calculation
     amountInputs.forEach((input) => {
       input.addEventListener('input', updateTotal);
+      // Ensure leading zero for decimal inputs
+      input.addEventListener('blur', () => {
+        if (input.value.startsWith('.')) {
+          input.value = '0' + input.value;
+          updateTotal();
+        }
+      });
     });
 
     // Handle form submission
@@ -909,7 +947,13 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
 
       try {
         amountInputs.forEach((input, index) => {
-          const value = input.value.trim();
+          let value = input.value.trim();
+          // Ensure leading zero for decimal inputs
+          if (value.startsWith('.')) {
+            value = '0' + value;
+            input.value = value;
+          }
+
           if (!/^\d+(\.\d+)?$/.test(value)) {
             throw new Error(`Invalid amount entered for Aavegotchi ID ${_tokenIds[index]}`);
           }
@@ -1110,7 +1154,7 @@ function initializeCopyButtons() {
         })
         .catch((err) => {
           console.error('Failed to copy!', err);
-          alert('Failed to copy the address. Please try again.');
+          showToast('Failed to copy the address. Please try again.', 'error');
         });
     });
   });
@@ -1161,7 +1205,7 @@ async function updateMaxButton(form) {
       if (filteredBalances.length === 0) {
         maxButton.disabled = true;
         maxButton.innerText = 'Max';
-        alert('None of your Aavegotchis hold the selected token.');
+        showToast('None of your Aavegotchis hold the selected token.', 'error');
         return;
       }
 
@@ -1185,6 +1229,7 @@ async function updateMaxButton(form) {
     maxButton.innerText = 'Max';
   } catch (error) {
     console.error('Error fetching token balance:', error);
+    showToast('Error fetching token balance.', 'error');
     maxButton.disabled = true;
     maxButton.innerText = 'Max';
   }

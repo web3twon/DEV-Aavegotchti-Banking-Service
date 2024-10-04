@@ -1,5 +1,3 @@
-/* styles.css */
-
 /* CSS Variables for Colors and Styling */
 :root {
   --color-dark-purple: #5e338f;
@@ -572,8 +570,6 @@ a:hover {
   margin-top: 10px;
 }
 
-
-
 /* Responsive Table */
 @media screen and (max-width: 600px) {
   .aavegotchi-table thead {
@@ -751,4 +747,52 @@ a:hover {
   .aavegotchi-info {
     max-height: 300px;
   }
+}
+
+/* Toast Styles */
+#toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000;
+}
+
+.toast {
+  min-width: 250px;
+  margin-bottom: 10px;
+  padding: 15px 20px;
+  border-radius: var(--border-radius);
+  color: var(--color-white);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  animation: fadein 0.5s, fadeout 0.5s 2.5s;
+}
+
+.toast-success {
+  background-color: #28a745; /* Green */
+}
+
+.toast-error {
+  background-color: #dc3545; /* Red */
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  color: var(--color-white);
+  font-size: 16px;
+  cursor: pointer;
+  margin-left: 15px;
+}
+
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeout {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-20px); }
 }
