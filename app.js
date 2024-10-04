@@ -488,14 +488,14 @@ function generateMethodForms() {
             const customAddress = customInput.value.trim();
             if (ethers.isAddress(customAddress)) {
               await updateSelectedERC20Token(customAddress);
+            } else {
+              showToast('Please enter a valid ERC20 contract address.', 'error');
             }
           }
         });
 
         // Initial update for default selection
-        updateSelectedERC20Token(inputElement.value).catch((err) => {
-          console.error('Initial ERC20 token update failed:', err);
-        });
+        await updateSelectedERC20Token(inputElement.value);
       } else if (input.name === '_transferAmount') {
         inputElement = document.createElement('input');
         inputElement.type = 'text';
@@ -538,9 +538,7 @@ function generateMethodForms() {
     form.addEventListener('change', () => updateMaxButton(form));
 
     // Call updateMaxButton to initialize the Max button
-    updateMaxButton(form).catch((err) => {
-      console.error('Initial Max button update failed:', err);
-    });
+    updateMaxButton(form);
   });
 
   // Include code for extra tools
