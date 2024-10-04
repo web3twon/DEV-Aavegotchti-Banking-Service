@@ -538,9 +538,9 @@ a:hover {
 
 /* Instruction Message Styles */
 .instruction {
-  font-size: 14px;
+  font-size: 20px;
   margin-bottom: 10px;
-  color: #333;
+  color: #FFF;
 }
 
 /* Additional Modal Form Styles */
