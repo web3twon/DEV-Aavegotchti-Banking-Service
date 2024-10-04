@@ -342,7 +342,7 @@ async function updateSelectedERC20Token(address) {
 }
 
 // Function to Generate Method Forms
-function generateMethodForms() {
+async function generateMethodForms() {
   methodFormsContainer.innerHTML = '';
   if (!contract) {
     methodFormsContainer.innerHTML = '<p>Please connect your wallet to interact with the contract.</p>';
