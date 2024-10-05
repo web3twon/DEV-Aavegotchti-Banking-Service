@@ -1311,16 +1311,26 @@ function validateAndFormatERC20Address(input) {
   return null;
 }
 
-// Event listener for custom ERC20 address input
+// Update the event listener for custom ERC20 address input
 document.addEventListener('input', async (event) => {
   if (event.target.id === 'custom-erc20-address') {
     const customAddress = event.target.value.trim();
+    
+    if (customAddress === '') {
+      // If the input is empty, reset to default GHST token
+      await updateSelectedERC20Token(ghstContractAddress);
+      return;
+    }
+
     const formattedAddress = validateAndFormatERC20Address(customAddress);
     
     if (formattedAddress) {
       event.target.value = formattedAddress;
-      await updateSelectedERC20Token(formattedAddress);
+      await debouncedUpdateSelectedERC20Token(formattedAddress);
     } else {
+      // Only show the error toast if the input is not empty and not a valid address
+      showToast('Invalid ERC20 address. Please enter a valid address.', 'error');
+      
       // Clear the token info if the address is invalid
       selectedERC20Address = null;
       selectedERC20Symbol = '';
