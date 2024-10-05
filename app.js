@@ -353,7 +353,7 @@ async function generateMethodForms() { // Declared as async
   const facetMethods = getFacetMethods(selectedFacet);
 
   if (!facetMethods) {
-    methodFormsContainer.innerHTML = '<p>No methods found for the selected facet.</p>';
+methodFormsContainer.innerHTML = '<p>No methods found for the selected facet.</p>';
     return;
   }
 
@@ -762,7 +762,7 @@ async function handleFormSubmit(event) {
       const balancesResult = await Promise.all(balancePromises);
       const filteredData = balancesResult.filter(({ balance }) => balance > 0n);
 
-      if (filteredData.length === 0) {
+if (filteredData.length === 0) {
         throw new Error('None of your Aavegotchis hold the selected token.');
       }
 
@@ -1168,7 +1168,7 @@ function initializeCopyButtons() {
             button.innerText = '📄';
           }, 2000);
         })
-        .catch((err) => {
+.catch((err) => {
           console.error('Failed to copy!', err);
           showToast('Failed to copy the address. Please try again.', 'error');
         });
@@ -1301,3 +1301,86 @@ async function refreshTableBalances() {
     showToast('Failed to refresh token balances.', 'error');
   }
 }
+
+// Function to validate and format ERC20 address input
+function validateAndFormatERC20Address(input) {
+  const address = input.trim();
+  if (ethers.isAddress(address)) {
+    return ethers.getAddress(address); // This returns the checksum address
+  }
+  return null;
+}
+
+// Event listener for custom ERC20 address input
+document.addEventListener('input', async (event) => {
+  if (event.target.id === 'custom-erc20-address') {
+    const customAddress = event.target.value.trim();
+    const formattedAddress = validateAndFormatERC20Address(customAddress);
+    
+    if (formattedAddress) {
+      event.target.value = formattedAddress;
+      await updateSelectedERC20Token(formattedAddress);
+    } else {
+      // Clear the token info if the address is invalid
+      selectedERC20Address = null;
+      selectedERC20Symbol = '';
+      selectedERC20Decimals = 18;
+
+      const tableHeader = document.querySelector('.aavegotchi-table th:nth-child(4)');
+      if (tableHeader) {
+        tableHeader.innerText = 'Token Balance';
+      }
+
+      await refreshTableBalances();
+    }
+  }
+});
+
+// Debounce function
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// Debounced version of the updateSelectedERC20Token function
+const debouncedUpdateSelectedERC20Token = debounce(updateSelectedERC20Token, 300);
+
+// Update the event listener for custom ERC20 address input
+document.addEventListener('input', async (event) => {
+  if (event.target.id === 'custom-erc20-address') {
+    const customAddress = event.target.value.trim();
+    const formattedAddress = validateAndFormatERC20Address(customAddress);
+    
+    if (formattedAddress) {
+      event.target.value = formattedAddress;
+      await debouncedUpdateSelectedERC20Token(formattedAddress);
+    } else {
+      // Only show the error toast if the input is not empty
+      if (customAddress !== '') {
+        showToast('Invalid ERC20 address. Please enter a valid address.', 'error');
+      }
+      
+      // Clear the token info if the address is invalid
+      selectedERC20Address = null;
+      selectedERC20Symbol = '';
+      selectedERC20Decimals = 18;
+
+      const tableHeader = document.querySelector('.aavegotchi-table th:nth-child(4)');
+      if (tableHeader) {
+        tableHeader.innerText = 'Token Balance';
+      }
+
+      await refreshTableBalances();
+    }
+  }
+});
+
+// Add this at the end of your file
+console.log('app.js loaded');
