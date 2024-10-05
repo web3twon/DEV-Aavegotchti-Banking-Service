@@ -1280,6 +1280,16 @@ window.onload = async () => {
 // Function to Refresh Table Balances Based on Selected ERC20 Token
 async function refreshTableBalances() {
   try {
+    if (!selectedERC20Address) {
+      // If no valid ERC20 address is selected, clear the balances
+      const rows = document.querySelectorAll('.aavegotchi-table tbody tr');
+      rows.forEach(row => {
+        const balanceCell = row.querySelector('td:nth-child(4)');
+        balanceCell.innerText = 'N/A';
+      });
+      return;
+    }
+
     const rows = document.querySelectorAll('.aavegotchi-table tbody tr');
     const tokenContract = new ethers.Contract(selectedERC20Address, ghstABI, provider);
 
@@ -1316,8 +1326,8 @@ document.addEventListener('input', async (event) => {
   if (event.target.id === 'custom-erc20-address') {
     const customAddress = event.target.value.trim();
     
-    if (customAddress === '') {
-      // If the input is empty, reset to default GHST token
+    // If the input is empty or not a complete address, reset to default GHST token
+    if (customAddress === '' || customAddress.length < 42) {
       await updateSelectedERC20Token(ghstContractAddress);
       return;
     }
@@ -1328,7 +1338,7 @@ document.addEventListener('input', async (event) => {
       event.target.value = formattedAddress;
       await debouncedUpdateSelectedERC20Token(formattedAddress);
     } else {
-      // Only show the error toast if the input is not empty and not a valid address
+      // Only show the error toast if the input is a complete address but invalid
       showToast('Invalid ERC20 address. Please enter a valid address.', 'error');
       
       // Clear the token info if the address is invalid
@@ -1341,7 +1351,7 @@ document.addEventListener('input', async (event) => {
         tableHeader.innerText = 'Token Balance';
       }
 
-      await refreshTableBalances();
+      // Don't refresh table balances here to avoid errors
     }
   }
 });
