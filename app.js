@@ -2,7 +2,7 @@
 
 // Ensure ethers.js version 6.13.2 is used
 // Included in your HTML with SRI:
-// <script src="https://cdnjs.cloudflare.com/ajax/ajax/libs/ethers/6.13.2/ethers.umd.min.js" integrity="sha384-gpR0Q6Hx/O+uevlbpbANbS0LWjbejPV1sqD/8w422l/fW8whGY0EPmKw3uG7ACYP" crossorigin="anonymous"></script>
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js" integrity="sha384-gpR0Q6Hx/O+uevlbpbANbS0LWjbejPV1sqD/8w422l/fW8whGY0EPmKw3uG7ACYP" crossorigin="anonymous"></script>
 
 // Contract Information
 const contractAddress = '0x86935F11C86623deC8a25696E1C19a8659CbF95d';
@@ -352,8 +352,8 @@ async function generateMethodForms() { // Declared as async
   const selectedFacet = 'EscrowFacet';
   const facetMethods = getFacetMethods(selectedFacet);
 
-  if (!facetMethods) {
-methodFormsContainer.innerHTML = '<p>No methods found for the selected facet.</p>';
+if (!facetMethods) {
+    methodFormsContainer.innerHTML = '<p>No methods found for the selected facet.</p>';
     return;
   }
 
@@ -485,27 +485,7 @@ methodFormsContainer.innerHTML = '<p>No methods found for the selected facet.</p
           }
         });
 
-        customInput.addEventListener('input', async (e) => {
-          const customAddress = e.target.value.trim();
-          if (customAddress === '') {
-            selectedERC20Address = null;
-            selectedERC20Symbol = '';
-            selectedERC20Decimals = 18;
-
-            const tableHeader = document.querySelector('.aavegotchi-table th:nth-child(4)');
-            if (tableHeader) {
-              tableHeader.innerText = `Token Balance`;
-            }
-
-            await refreshTableBalances();
-            return;
-          }
-          if (ethers.isAddress(customAddress)) {
-            await updateSelectedERC20Token(customAddress);
-          } else {
-            showToast('Please enter a valid ERC20 contract address.', 'error');
-          }
-        });
+        customInput.addEventListener('input', debouncedUpdateERC20Token);
 
         await updateSelectedERC20Token(inputElement.value);
       } else if (input.name === '_transferAmount') {
@@ -762,7 +742,7 @@ async function handleFormSubmit(event) {
       const balancesResult = await Promise.all(balancePromises);
       const filteredData = balancesResult.filter(({ balance }) => balance > 0n);
 
-if (filteredData.length === 0) {
+      if (filteredData.length === 0) {
         throw new Error('None of your Aavegotchis hold the selected token.');
       }
 
@@ -778,7 +758,7 @@ if (filteredData.length === 0) {
         throw new Error('Invalid number for amount');
       }
 
-      const decimals = await tokenContract.decimals();
+const decimals = await tokenContract.decimals();
       const totalTransferAmount = ethers.parseUnits(transferAmountValue, decimals);
 
       if (totalTransferAmount > totalAvailableBalance) {
@@ -1168,7 +1148,7 @@ function initializeCopyButtons() {
             button.innerText = '📄';
           }, 2000);
         })
-.catch((err) => {
+        .catch((err) => {
           console.error('Failed to copy!', err);
           showToast('Failed to copy the address. Please try again.', 'error');
         });
@@ -1185,7 +1165,7 @@ async function updateMaxButton(form) {
   const tokenIdValue = tokenIdSelect ? tokenIdSelect.value : null;
   let erc20Address = erc20ContractSelect ? erc20ContractSelect.value : null;
 
-  if (erc20Address === 'custom') {
+if (erc20Address === 'custom') {
     erc20Address = customErc20Input ? customErc20Input.value : null;
   }
 
@@ -1280,9 +1260,10 @@ window.onload = async () => {
 // Function to Refresh Table Balances Based on Selected ERC20 Token
 async function refreshTableBalances() {
   try {
-    if (!selectedERC20Address) {
+    const rows = document.querySelectorAll('.aavegotchi-table tbody tr');
+    
+    if (!selectedERC20Address || !ethers.isAddress(selectedERC20Address)) {
       // If no valid ERC20 address is selected, clear the balances
-      const rows = document.querySelectorAll('.aavegotchi-table tbody tr');
       rows.forEach(row => {
         const balanceCell = row.querySelector('td:nth-child(4)');
         balanceCell.innerText = 'N/A';
@@ -1290,7 +1271,6 @@ async function refreshTableBalances() {
       return;
     }
 
-    const rows = document.querySelectorAll('.aavegotchi-table tbody tr');
     const tokenContract = new ethers.Contract(selectedERC20Address, ghstABI, provider);
 
     const balancePromises = Array.from(rows).map((row) => {
@@ -1321,41 +1301,6 @@ function validateAndFormatERC20Address(input) {
   return null;
 }
 
-// Update the event listener for custom ERC20 address input
-document.addEventListener('input', async (event) => {
-  if (event.target.id === 'custom-erc20-address') {
-    const customAddress = event.target.value.trim();
-    
-    // If the input is empty or not a complete address, reset to default GHST token
-    if (customAddress === '' || customAddress.length < 42) {
-      await updateSelectedERC20Token(ghstContractAddress);
-      return;
-    }
-
-    const formattedAddress = validateAndFormatERC20Address(customAddress);
-    
-    if (formattedAddress) {
-      event.target.value = formattedAddress;
-      await debouncedUpdateSelectedERC20Token(formattedAddress);
-    } else {
-      // Only show the error toast if the input is a complete address but invalid
-      showToast('Invalid ERC20 address. Please enter a valid address.', 'error');
-      
-      // Clear the token info if the address is invalid
-      selectedERC20Address = null;
-      selectedERC20Symbol = '';
-      selectedERC20Decimals = 18;
-
-      const tableHeader = document.querySelector('.aavegotchi-table th:nth-child(4)');
-      if (tableHeader) {
-        tableHeader.innerText = 'Token Balance';
-      }
-
-      // Don't refresh table balances here to avoid errors
-    }
-  }
-});
-
 // Debounce function
 function debounce(func, wait) {
   let timeout;
@@ -1370,35 +1315,41 @@ function debounce(func, wait) {
 }
 
 // Debounced version of the updateSelectedERC20Token function
-const debouncedUpdateSelectedERC20Token = debounce(updateSelectedERC20Token, 300);
+const debouncedUpdateERC20Token = debounce(async (address) => {
+  if (address === '' || address.length < 42) {
+    // Reset to default GHST token
+    selectedERC20Address = ghstContractAddress;
+    selectedERC20Symbol = 'GHST';
+    selectedERC20Decimals = 18;
+  } else {
+    const formattedAddress = validateAndFormatERC20Address(address);
+    if (formattedAddress) {
+      try {
+        await updateSelectedERC20Token(formattedAddress);
+      } catch (error) {
+        console.error('Error updating ERC20 token:', error);
+        showToast('Invalid ERC20 token address.', 'error');
+      }
+    } else {
+      showToast('Invalid ERC20 address format.', 'error');
+    }
+  }
+  
+  // Update table header
+  const tableHeader = document.querySelector('.aavegotchi-table th:nth-child(4)');
+  if (tableHeader) {
+    tableHeader.innerText = `${selectedERC20Symbol} Balance`;
+  }
+  
+  // Refresh table balances
+  await refreshTableBalances();
+}, 500); // 500ms debounce time
 
 // Update the event listener for custom ERC20 address input
-document.addEventListener('input', async (event) => {
+document.addEventListener('input', (event) => {
   if (event.target.id === 'custom-erc20-address') {
     const customAddress = event.target.value.trim();
-    const formattedAddress = validateAndFormatERC20Address(customAddress);
-    
-    if (formattedAddress) {
-      event.target.value = formattedAddress;
-      await debouncedUpdateSelectedERC20Token(formattedAddress);
-    } else {
-      // Only show the error toast if the input is not empty
-      if (customAddress !== '') {
-        showToast('Invalid ERC20 address. Please enter a valid address.', 'error');
-      }
-      
-      // Clear the token info if the address is invalid
-      selectedERC20Address = null;
-      selectedERC20Symbol = '';
-      selectedERC20Decimals = 18;
-
-      const tableHeader = document.querySelector('.aavegotchi-table th:nth-child(4)');
-      if (tableHeader) {
-        tableHeader.innerText = 'Token Balance';
-      }
-
-      await refreshTableBalances();
-    }
+    debouncedUpdateERC20Token(customAddress);
   }
 });
 
