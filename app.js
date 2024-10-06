@@ -1119,10 +1119,15 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       tokenBalanceCell.setAttribute('data-label', `${tokenSymbol} Balance`);
       
       const tokenImage = document.createElement('img');
-      tokenImage.src = `https://api.coingecko.com/api/v3/coins/polygon-pos/contract/${selectedERC20Address}/image?size=small`;
+      const imageUrl = await getTokenImageUrl(selectedERC20Address);
+      tokenImage.src = imageUrl;
       tokenImage.alt = tokenSymbol;
       tokenImage.width = 100;
       tokenImage.height = 100;
+      tokenImage.onerror = function() {
+        this.onerror = null;
+        this.src = 'path/to/default/token/image.png'; // Use a default image path
+      };
       
       const tokenBalanceWrapper = document.createElement('div');
       tokenBalanceWrapper.className = 'token-balance';
@@ -1156,6 +1161,27 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     console.error('Error fetching Aavegotchis:', error);
     aavegotchiInfoContainer.innerHTML = '<p>Error fetching Aavegotchis. See console for details.</p>';
   }
+}
+
+// Function to get token image URL
+const tokenImageCache = new Map();
+
+async function getTokenImageUrl(tokenAddress) {
+    if (tokenImageCache.has(tokenAddress)) {
+        return tokenImageCache.get(tokenAddress);
+    }
+
+    try {
+        const response = await fetch(`https://api.coingecko.com/api/v3/coins/polygon-pos/contract/${tokenAddress}`);
+        if (!response.ok) throw new Error('Failed to fetch token data');
+        const data = await response.json();
+        const imageUrl = data.image.small;
+        tokenImageCache.set(tokenAddress, imageUrl);
+        return imageUrl;
+    } catch (error) {
+        console.error('Error fetching token image:', error);
+        return 'path/to/default/token/image.png'; // Use a default image path
+    }
 }
 
 // Function to Initialize Copy Button Event Listeners
@@ -1305,16 +1331,22 @@ async function refreshTableBalances() {
 
     const balances = await Promise.all(balancePromises);
 
+    const imageUrl = await getTokenImageUrl(selectedERC20Address);
+
     for (let index = 0; index < rows.length; index++) {
       const row = rows[index];
       const balanceCell = row.querySelector('td:nth-child(4)');
       const formattedBalance = ethers.formatUnits(balances[index], selectedERC20Decimals);
       
       const tokenImage = document.createElement('img');
-      tokenImage.src = `https://api.coingecko.com/api/v3/coins/polygon-pos/contract/${selectedERC20Address}/image?size=small`;
+      tokenImage.src = imageUrl;
       tokenImage.alt = selectedERC20Symbol;
       tokenImage.width = 100;
       tokenImage.height = 100;
+      tokenImage.onerror = function() {
+        this.onerror = null;
+        this.src = 'path/to/default/token/image.png'; // Use a default image path
+      };
       
       const tokenBalanceWrapper = document.createElement('div');
       tokenBalanceWrapper.className = 'token-balance';
