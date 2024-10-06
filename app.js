@@ -1119,7 +1119,7 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       tokenBalanceCell.setAttribute('data-label', `${tokenSymbol} Balance`);
       
       const tokenImage = document.createElement('img');
-      tokenImage.src = `https://api.coingecko.com/api/v3/coins/${tokenSymbol.toLowerCase()}/image?size=small`;
+      tokenImage.src = `https://api.coingecko.com/api/v3/coins/polygon-pos/contract/${selectedERC20Address}/image?size=small`;
       tokenImage.alt = tokenSymbol;
       tokenImage.width = 100;
       tokenImage.height = 100;
@@ -1282,7 +1282,6 @@ window.onload = async () => {
     await connectWallet();
   }
 };
-
 // Function to Refresh Table Balances Based on Selected ERC20 Token
 async function refreshTableBalances() {
   try {
@@ -1312,7 +1311,7 @@ async function refreshTableBalances() {
       const formattedBalance = ethers.formatUnits(balances[index], selectedERC20Decimals);
       
       const tokenImage = document.createElement('img');
-      tokenImage.src = `https://api.coingecko.com/api/v3/coins/${selectedERC20Symbol.toLowerCase()}/image?size=small`;
+      tokenImage.src = `https://api.coingecko.com/api/v3/coins/polygon-pos/contract/${selectedERC20Address}/image?size=small`;
       tokenImage.alt = selectedERC20Symbol;
       tokenImage.width = 100;
       tokenImage.height = 100;
@@ -1411,7 +1410,7 @@ function shortenAddress(address) {
 // Function to get token metadata
 async function getTokenMetadata(tokenAddress) {
   try {
-    const response = await fetch(`https://api.coingecko.com/api/v3/coins/ethereum/contract/${tokenAddress}`);
+    const response = await fetch(`https://api.coingecko.com/api/v3/coins/polygon-pos/contract/${tokenAddress}`);
     if (!response.ok) {
       throw new Error('Failed to fetch token metadata');
     }
@@ -1419,7 +1418,7 @@ async function getTokenMetadata(tokenAddress) {
     return {
       name: data.name,
       symbol: data.symbol,
-      decimals: data.detail_platforms.ethereum.decimal_place,
+      decimals: data.detail_platforms["polygon-pos"].decimal_place,
       image: data.image.small
     };
   } catch (error) {
