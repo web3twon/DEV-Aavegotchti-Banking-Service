@@ -786,13 +786,13 @@ a:hover {
 
 /* Token Image Styles */
 .token-balance {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
 }
 
 .token-balance span {
-  margin-right: 10px;
+    margin-right: 10px;
 }
 
 .token-balance img {

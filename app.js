@@ -1120,11 +1120,11 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       
       const tokenBalanceWrapper = document.createElement('div');
       tokenBalanceWrapper.className = 'token-balance';
-      
+
       const balanceText = document.createElement('span');
       balanceText.textContent = tokenBalance;
       tokenBalanceWrapper.appendChild(balanceText);
-      
+
       const tokenImage = document.createElement('img');
       const imageUrl = await getTokenImageUrl(selectedERC20Address);
       tokenImage.src = imageUrl;
@@ -1132,8 +1132,8 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       tokenImage.width = 100;
       tokenImage.height = 100;
       tokenImage.onerror = function() {
-          this.onerror = null;
-          this.src = 'path/to/default/token/image.png'; // Use a default image path
+        this.onerror = null;
+        this.src = 'path/to/default/token/image.png'; // Use a default image path
       };
       tokenBalanceWrapper.appendChild(tokenImage);
       
