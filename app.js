@@ -179,23 +179,30 @@ const _0x5a8e=['4e524e4d3347465456','52131','4e524654393933464b4641364634594d314
 
 // Function to fetch rarity farming deposits
 async function fetchRarityFarmingDeposits(escrowAddress) {
-  const url = `https://api.polygonscan.com/api?module=account&action=txlist&address=${escrowAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
+  const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7'; // GHST token on Polygon
+  const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
 
   try {
     const response = await fetch(url);
     const data = await response.json();
 
+    if (data.status === '0' && data.message === 'No transactions found') {
+      console.log(`No transactions found for address: ${escrowAddress}`);
+      return [];
+    }
+
     if (data.status !== '1') {
       throw new Error(`API request failed: ${data.message}`);
     }
 
-    const rarityFarmingDeposits = data.result.filter(tx => 
-      tx.input.startsWith(RARITY_FARMING_FUNCTION) && tx.to.toLowerCase() === escrowAddress.toLowerCase()
+    const deposits = data.result.filter(tx => 
+      tx.to.toLowerCase() === escrowAddress.toLowerCase() && 
+      tx.contractAddress.toLowerCase() === GHST_CONTRACT.toLowerCase()
     );
 
-    return rarityFarmingDeposits.map(tx => ({
+    return deposits.map(tx => ({
       hash: tx.hash,
-      value: ethers.formatUnits(tx.value, 18), // Assuming GHST has 18 decimals
+      value: ethers.formatUnits(tx.value, 18),
       timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleString()
     }));
   } catch (error) {
@@ -274,6 +281,7 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     const lendingStatusPromises = [];
     const rarityFarmingDepositsPromises = [];
     for (const aavegotchi of aavegotchis) {
+      console.log(`Fetching deposits for Aavegotchi #${aavegotchi.tokenId}, Escrow: ${aavegotchi.escrow}`);
       balancePromises.push(tokenContract.balanceOf(aavegotchi.escrow));
       lendingStatusPromises.push(contract.isAavegotchiLent(aavegotchi.tokenId));
       rarityFarmingDepositsPromises.push(fetchRarityFarmingDeposits(aavegotchi.escrow));
@@ -291,13 +299,12 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       const isLent = lendingStatuses[index];
       const isOwned = !isLent;
 
-      if (isOwned) {
-        ownedAavegotchis.push(aavegotchi);
+      if (isOwned) {ownedAavegotchis.push(aavegotchi);
         ownedGotchis.push({ 
           aavegotchi, 
           balance: balances[index], 
           isLent,
-rarityFarmingDeposits: rarityFarmingDeposits[index]
+          rarityFarmingDeposits: rarityFarmingDeposits[index]
         });
       } else {
         rentedGotchis.push({ 
@@ -395,6 +402,7 @@ rarityFarmingDeposits: rarityFarmingDeposits[index]
 
       const rarityFarmingCell = document.createElement('td');
       rarityFarmingCell.setAttribute('data-label', 'Rarity Farming Deposits');
+      console.log(`Aavegotchi #${aavegotchi.tokenId} has ${rarityFarmingDeposits.length} deposits`);
       if (rarityFarmingDeposits.length > 0) {
         const depositList = document.createElement('ul');
         depositList.className = 'deposit-list';
@@ -674,8 +682,7 @@ async function generateMethodForms() {
 
       let inputElement;
       if (input.name === '_tokenId') {
-        inputElement = document.createElement('select');
-        inputElement.className = 'select';
+inputElement.className = 'select';
         inputElement.id = input.name;
         inputElement.name = input.name;
 
@@ -686,7 +693,7 @@ async function generateMethodForms() {
           inputElement.appendChild(allOption);
         }
 
-for (const aavegotchi of ownedAavegotchis) {
+        for (const aavegotchi of ownedAavegotchis) {
           const option = document.createElement('option');
           option.value = aavegotchi.tokenId.toString();
           const name = aavegotchi.name && aavegotchi.name.trim() !== '' ? aavegotchi.name : '(No Name)';
@@ -1079,7 +1086,7 @@ async function handleFormSubmit(event) {
       args.push(transferAmount);
     }
 
-    const tx = await contract[methodName](...args);
+const tx = await contract[methodName](...args);
     showToast(`Transaction submitted. Hash: ${tx.hash}`, 'success');
     await tx.wait();
     showToast('Transaction confirmed!', 'success');
@@ -1088,7 +1095,7 @@ async function handleFormSubmit(event) {
     await generateMethodForms();
   } catch (error) {
     console.error(error);
-showToast(`Error: ${error.info?.error?.message || error.message}`, 'error');
+    showToast(`Error: ${error.info?.error?.message || error.message}`, 'error');
   } finally {
     submitButton.disabled = false;
     submitButton.innerText = 'Submit';
@@ -1492,7 +1499,7 @@ const debouncedUpdateERC20Token = debounce(async (address) => {
     selectedERC20Address = ghstContractAddress;
     selectedERC20Symbol = 'GHST';
     selectedERC20Decimals = 18;
-  } else {
+} else {
     const formattedAddress = validateAndFormatERC20Address(address);
     if (formattedAddress) {
       try {
@@ -1683,4 +1690,3 @@ window.onload = async () => {
 };
 
 console.log('app.js loaded');
-	  
