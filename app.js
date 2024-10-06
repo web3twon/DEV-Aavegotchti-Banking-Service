@@ -352,7 +352,7 @@ async function generateMethodForms() {
   const selectedFacet = 'EscrowFacet';
   const facetMethods = getFacetMethods(selectedFacet);
 
-  if (!facetMethods) {
+if (!facetMethods) {
     methodFormsContainer.innerHTML = '<p>No methods found for the selected facet.</p>';
     return;
   }
@@ -687,7 +687,6 @@ function getFacetMethods(facet) {
 
   return facets[facet];
 }
-
 // Function to Handle Form Submission
 async function handleFormSubmit(event) {
   event.preventDefault();
@@ -744,7 +743,7 @@ async function handleFormSubmit(event) {
       const balancesResult = await Promise.all(balancePromises);
       const filteredData = balancesResult.filter(({ balance }) => balance > 0n);
 
-if (filteredData.length === 0) {
+      if (filteredData.length === 0) {
         throw new Error('None of your Aavegotchis hold the selected token.');
       }
 
@@ -1006,7 +1005,6 @@ function toggleCollapse(contentElement, iconElement, expand) {
     iconElement.innerHTML = '&#9660;';
   }
 }
-
 // Function to Fetch and Display Aavegotchis
 async function fetchAndDisplayAavegotchis(ownerAddress) {
   try {
@@ -1067,7 +1065,7 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     }
 
     // Sort owned Gotchis by balance in descending order
-    ownedGotchis.sort((a, b) => b.balance - a.balance);
+    ownedGotchis.sort((a, b) => b.balance > a.balance ? 1 : -1);
 
     // Combine sorted owned Gotchis with rented Gotchis
     const sortedGotchis = [...ownedGotchis, ...rentedGotchis];
@@ -1134,7 +1132,7 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       tokenBalanceCell.appendChild(tokenBalanceWrapper);
       row.appendChild(tokenBalanceCell);
 
-const statusCell = document.createElement('td');
+      const statusCell = document.createElement('td');
       statusCell.setAttribute('data-label', 'Status');
       if (!isLent) {
         statusCell.innerText = 'Owned';
@@ -1393,6 +1391,157 @@ document.addEventListener('input', (event) => {
     debouncedUpdateERC20Token(customAddress);
   }
 });
+
+// Error handling function
+function handleError(error) {
+  console.error('An error occurred:', error);
+  showToast(`Error: ${error.message || 'Unknown error occurred'}`, 'error');
+}
+
+// Function to format large numbers with commas
+function formatNumberWithCommas(number) {
+  return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+// Function to shorten addresses
+function shortenAddress(address) {
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}
+
+// Function to get token metadata
+async function getTokenMetadata(tokenAddress) {
+  try {
+    const response = await fetch(`https://api.coingecko.com/api/v3/coins/ethereum/contract/${tokenAddress}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch token metadata');
+    }
+    const data = await response.json();
+    return {
+      name: data.name,
+      symbol: data.symbol,
+      decimals: data.detail_platforms.ethereum.decimal_place,
+      image: data.image.small
+    };
+  } catch (error) {
+    console.error('Error fetching token metadata:', error);
+    return null;
+  }
+}
+
+// Function to update UI with token metadata
+async function updateTokenMetadata(tokenAddress) {
+  const metadata = await getTokenMetadata(tokenAddress);
+  if (metadata) {
+    selectedERC20Symbol = metadata.symbol;
+    selectedERC20Decimals = metadata.decimals;
+    // Update any UI elements that display token information
+    const tokenInfoElement = document.getElementById('token-info');
+    if (tokenInfoElement) {
+      tokenInfoElement.innerHTML = `
+        <img src="${metadata.image}" alt="${metadata.name}" width="24" height="24">
+        <span>${metadata.name} (${metadata.symbol})</span>
+      `;
+    }
+  }
+}
+
+// Function to calculate and display gas estimates
+async function estimateGas(methodName, args) {
+  try {
+    const gasEstimate = await contract.estimateGas[methodName](...args);
+    const gasPriceWei = await provider.getGasPrice();
+    const gasPrice = ethers.formatUnits(gasPriceWei, 'gwei');
+    const totalCost = gasEstimate * gasPriceWei;
+    const totalCostEth = ethers.formatEther(totalCost);
+    
+    const gasInfoElement = document.getElementById('gas-info');
+    if (gasInfoElement) {
+      gasInfoElement.innerHTML = `
+        Estimated Gas: ${formatNumberWithCommas(gasEstimate)} units<br>
+        Gas Price: ${parseFloat(gasPrice).toFixed(2)} Gwei<br>
+        Estimated Total Cost: ${parseFloat(totalCostEth).toFixed(6)} ETH
+      `;
+    }
+  } catch (error) {
+    console.error('Error estimating gas:', error);
+    showToast('Failed to estimate gas cost', 'error');
+  }
+}
+
+// Function to update the UI based on network changes
+async function updateUIForNetwork() {
+  const network = await provider.getNetwork();
+  const networkName = getNetworkName(network.chainId);
+  document.getElementById('network-name').textContent = networkName;
+  // You can add more UI updates based on the network here
+}
+
+// Helper function to get network name from chain ID
+function getNetworkName(chainId) {
+  const networks = {
+    1: 'Ethereum Mainnet',
+    3: 'Ropsten Testnet',
+    4: 'Rinkeby Testnet',
+    5: 'Goerli Testnet',
+    42: 'Kovan Testnet',
+    137: 'Polygon Mainnet',
+    80001: 'Mumbai Testnet'
+  };
+  return networks[chainId] || 'Unknown Network';
+}
+
+// Event listener for network changes
+if (window.ethereum) {
+  window.ethereum.on('chainChanged', (chainId) => {
+    window.location.reload();
+  });
+}
+
+// Function to switch networks
+async function switchNetwork(chainId) {
+  try {
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: ethers.utils.hexValue(chainId) }],
+    });
+  } catch (switchError) {
+    // This error code indicates that the chain has not been added to MetaMask.
+    if (switchError.code === 4902) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [getNetworkParams(chainId)],
+        });
+      } catch (addError) {
+        console.error('Failed to add network:', addError);
+        showToast('Failed to add network to MetaMask', 'error');
+      }
+    } else {
+      console.error('Failed to switch network:', switchError);
+      showToast('Failed to switch network', 'error');
+    }
+  }
+}
+
+// Helper function to get network parameters
+function getNetworkParams(chainId) {
+  // Define network parameters for different chains
+  const networkParams = {
+    137: {
+      chainId: '0x89',
+      chainName: 'Polygon Mainnet',
+      nativeCurrency: {
+        name: 'MATIC',
+        symbol: 'MATIC',
+        decimals: 18
+      },
+      rpcUrls: ['https://polygon-rpc.com/'],
+      blockExplorerUrls: ['https://polygonscan.com/']
+    },
+    // Add more network configurations as needed
+  };
+  return networkParams[chainId];
+}
 
 // Add this at the end of your file
 console.log('app.js loaded');
