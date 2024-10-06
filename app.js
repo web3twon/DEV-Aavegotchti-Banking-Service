@@ -342,7 +342,7 @@ async function updateSelectedERC20Token(address) {
 }
 
 // Function to Generate Method Forms
-async function generateMethodForms() { // Declared as async
+async function generateMethodForms() {
   methodFormsContainer.innerHTML = '';
   if (!contract) {
     methodFormsContainer.innerHTML = '<p>Please connect your wallet to interact with the contract.</p>';
@@ -369,7 +369,7 @@ async function generateMethodForms() { // Declared as async
     formHeader.className = 'form-header';
 
     const formTitle = document.createElement('h3');
-    formTitle.innerText = 'TransferEscrow (Withdraw)';
+    formTitle.innerText = 'Withdraw (TransferEscrow)';
     formHeader.appendChild(formTitle);
     formContainer.appendChild(formHeader);
 
@@ -642,6 +642,7 @@ function generateExtraTools(facetMethods, extraMethodNames) {
     });
   }
 }
+
 // Function to Get Methods for a Facet
 function getFacetMethods(facet) {
   const facets = {
@@ -743,7 +744,7 @@ async function handleFormSubmit(event) {
       const balancesResult = await Promise.all(balancePromises);
       const filteredData = balancesResult.filter(({ balance }) => balance > 0n);
 
-      if (filteredData.length === 0) {
+if (filteredData.length === 0) {
         throw new Error('None of your Aavegotchis hold the selected token.');
       }
 
@@ -1049,6 +1050,9 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     const balances = await Promise.all(balancePromises);
     const lendingStatuses = await Promise.all(lendingStatusPromises);
 
+    const ownedGotchis = [];
+    const rentedGotchis = [];
+
     for (let index = 0; index < aavegotchis.length; index++) {
       const aavegotchi = aavegotchis[index];
       const isLent = lendingStatuses[index];
@@ -1056,8 +1060,19 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
 
       if (isOwned) {
         ownedAavegotchis.push(aavegotchi);
+        ownedGotchis.push({ aavegotchi, balance: balances[index], isLent });
+      } else {
+        rentedGotchis.push({ aavegotchi, balance: balances[index], isLent });
       }
+    }
 
+    // Sort owned Gotchis by balance in descending order
+    ownedGotchis.sort((a, b) => b.balance - a.balance);
+
+    // Combine sorted owned Gotchis with rented Gotchis
+    const sortedGotchis = [...ownedGotchis, ...rentedGotchis];
+
+    for (const { aavegotchi, balance, isLent } of sortedGotchis) {
       const row = document.createElement('tr');
 
       const tokenId = aavegotchi.tokenId.toString();
@@ -1066,7 +1081,7 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       const shortEscrowWallet = `${escrowWallet.slice(0, 6)}...${escrowWallet.slice(-4)}`;
 
       escrowBalances[escrowWallet] = {
-        tokenBalance: balances[index],
+        tokenBalance: balance,
         tokenSymbol: tokenSymbol,
       };
 
@@ -1100,16 +1115,28 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
 
       row.appendChild(escrowCell);
 
-      const tokenBalanceRaw = balances[index];
+      const tokenBalanceRaw = balance;
       const tokenBalance = ethers.formatUnits(tokenBalanceRaw, tokenDecimals);
       const tokenBalanceCell = document.createElement('td');
       tokenBalanceCell.setAttribute('data-label', `${tokenSymbol} Balance`);
-      tokenBalanceCell.innerText = `${tokenBalance} ${tokenSymbol}`;
+      
+      const tokenImage = document.createElement('img');
+      tokenImage.src = `https://api.coingecko.com/api/v3/coins/${tokenSymbol.toLowerCase()}/image?size=small`;
+      tokenImage.alt = tokenSymbol;
+      tokenImage.width = 100;
+      tokenImage.height = 100;
+      
+      const tokenBalanceWrapper = document.createElement('div');
+      tokenBalanceWrapper.className = 'token-balance';
+      tokenBalanceWrapper.appendChild(tokenImage);
+      tokenBalanceWrapper.appendChild(document.createTextNode(tokenBalance));
+      
+      tokenBalanceCell.appendChild(tokenBalanceWrapper);
       row.appendChild(tokenBalanceCell);
 
-      const statusCell = document.createElement('td');
+const statusCell = document.createElement('td');
       statusCell.setAttribute('data-label', 'Status');
-      if (isOwned) {
+      if (!isLent) {
         statusCell.innerText = 'Owned';
         statusCell.className = 'status-owned';
       } else {
@@ -1285,7 +1312,20 @@ async function refreshTableBalances() {
       const row = rows[index];
       const balanceCell = row.querySelector('td:nth-child(4)');
       const formattedBalance = ethers.formatUnits(balances[index], selectedERC20Decimals);
-      balanceCell.innerText = `${formattedBalance} ${selectedERC20Symbol}`;
+      
+      const tokenImage = document.createElement('img');
+      tokenImage.src = `https://api.coingecko.com/api/v3/coins/${selectedERC20Symbol.toLowerCase()}/image?size=small`;
+      tokenImage.alt = selectedERC20Symbol;
+      tokenImage.width = 100;
+      tokenImage.height = 100;
+      
+      const tokenBalanceWrapper = document.createElement('div');
+      tokenBalanceWrapper.className = 'token-balance';
+      tokenBalanceWrapper.appendChild(tokenImage);
+      tokenBalanceWrapper.appendChild(document.createTextNode(formattedBalance));
+      
+      balanceCell.innerHTML = '';
+      balanceCell.appendChild(tokenBalanceWrapper);
     }
   } catch (error) {
     console.error('Error refreshing table balances:', error);
