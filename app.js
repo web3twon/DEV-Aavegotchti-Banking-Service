@@ -294,12 +294,13 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     const ownedGotchis = [];
     const rentedGotchis = [];
 
-    for (let index = 0; index < aavegotchis.length; index++) {
+for (let index = 0; index < aavegotchis.length; index++) {
       const aavegotchi = aavegotchis[index];
       const isLent = lendingStatuses[index];
       const isOwned = !isLent;
 
-      if (isOwned) {ownedAavegotchis.push(aavegotchi);
+      if (isOwned) {
+        ownedAavegotchis.push(aavegotchi);
         ownedGotchis.push({ 
           aavegotchi, 
           balance: balances[index], 
@@ -674,7 +675,7 @@ async function generateMethodForms() {
         } else {
           label.innerText = `${input.name} (${input.type}):`;
         }
-      } else {
+} else {
         label.innerText = `${input.name} (${input.type}):`;
       }
 
@@ -682,7 +683,8 @@ async function generateMethodForms() {
 
       let inputElement;
       if (input.name === '_tokenId') {
-inputElement.className = 'select';
+        inputElement = document.createElement('select');
+        inputElement.className = 'select';
         inputElement.id = input.name;
         inputElement.name = input.name;
 
@@ -1079,14 +1081,14 @@ async function handleFormSubmit(event) {
         throw new Error('Invalid number for amount');
       }
 
-      const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
+const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
       const decimals = await tokenContract.decimals();
       const transferAmount = ethers.parseUnits(transferAmountValue, decimals);
 
       args.push(transferAmount);
     }
 
-const tx = await contract[methodName](...args);
+    const tx = await contract[methodName](...args);
     showToast(`Transaction submitted. Hash: ${tx.hash}`, 'success');
     await tx.wait();
     showToast('Transaction confirmed!', 'success');
@@ -1499,7 +1501,7 @@ const debouncedUpdateERC20Token = debounce(async (address) => {
     selectedERC20Address = ghstContractAddress;
     selectedERC20Symbol = 'GHST';
     selectedERC20Decimals = 18;
-} else {
+  } else {
     const formattedAddress = validateAndFormatERC20Address(address);
     if (formattedAddress) {
       try {
