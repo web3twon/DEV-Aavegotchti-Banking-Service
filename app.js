@@ -171,6 +171,269 @@ const toastContainer = document.getElementById('toast-container');
 // Event Listeners
 connectWalletButton.addEventListener('click', connectWallet);
 
+// Constants for Rarity Farming
+const RARITY_FARMING_FUNCTION = '0xea20c3c6';
+
+// Obfuscated API Key (this is a basic obfuscation, not secure for client-side use)
+const _0x5a8e=['4e524e4d3347465456','52131','4e524654393933464b4641364634594d31424d4734504b434b'];(function(_0x39cef8,_0x5a8eb9){const _0x41cf84=function(_0x2839fc){while(--_0x2839fc){_0x39cef8['push'](_0x39cef8['shift']());}};_0x41cf84(++_0x5a8eb9);}(_0x5a8e,0xf3));const _0x41cf=function(_0x39cef8,_0x5a8eb9){_0x39cef8=_0x39cef8-0x0;let _0x41cf84=_0x5a8e[_0x39cef8];return _0x41cf84;};const POLYGONSCAN_API_KEY=(_0x41cf('0x0')+_0x41cf('0x2')+_0x41cf('0x1'))['replace'](/(.{2})/g,function(_0x2839fc){return String['fromCharCode'](parseInt(_0x2839fc,0x10));});
+
+// Function to fetch rarity farming deposits
+async function fetchRarityFarmingDeposits(escrowAddress) {
+  const url = `https://api.polygonscan.com/api?module=account&action=txlist&address=${escrowAddress}&startblock=0&endblock=99999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.status !== '1') {
+      throw new Error(`API request failed: ${data.message}`);
+    }
+
+    const rarityFarmingDeposits = data.result.filter(tx => 
+      tx.input.startsWith(RARITY_FARMING_FUNCTION) && tx.to.toLowerCase() === escrowAddress.toLowerCase()
+    );
+
+    return rarityFarmingDeposits.map(tx => ({
+      hash: tx.hash,
+      value: ethers.formatUnits(tx.value, 18), // Assuming GHST has 18 decimals
+      timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleString()
+    }));
+  } catch (error) {
+    console.error('Error fetching rarity farming deposits:', error);
+    return [];
+  }
+}
+
+// Function to show all deposits in a modal
+function showAllDeposits(deposits, tokenId, name) {
+  const modalOverlay = document.createElement('div');
+  modalOverlay.className = 'modal-overlay';
+
+  const modalContent = document.createElement('div');
+  modalContent.className = 'modal-content';
+
+  const modalTitle = document.createElement('h2');
+  modalTitle.innerText = `All Rarity Farming Deposits for Aavegotchi #${tokenId} (${name})`;
+  modalContent.appendChild(modalTitle);
+
+  const depositList = document.createElement('ul');
+  depositList.className = 'deposit-list';
+  deposits.forEach(deposit => {
+    const listItem = document.createElement('li');
+    listItem.innerText = `${deposit.value} GHST on ${deposit.timestamp}`;
+    depositList.appendChild(listItem);
+  });
+  modalContent.appendChild(depositList);
+
+  const closeButton = document.createElement('button');
+  closeButton.className = 'button';
+  closeButton.innerText = 'Close';
+  closeButton.addEventListener('click', () => {
+    document.body.removeChild(modalOverlay);
+  });
+  modalContent.appendChild(closeButton);
+
+  modalOverlay.appendChild(modalContent);
+  document.body.appendChild(modalOverlay);
+}
+
+// Function to Fetch and Display Aavegotchis
+async function fetchAndDisplayAavegotchis(ownerAddress) {
+  try {
+    ownedAavegotchis = [];
+    const aavegotchis = await contract.allAavegotchisOfOwner(ownerAddress);
+
+    if (aavegotchis.length === 0) {
+      aavegotchiInfoContainer.innerHTML = '<p>No Aavegotchis found for this wallet.</p>';
+      return;
+    }
+
+    const tokenContract = new ethers.Contract(selectedERC20Address, ghstABI, provider);
+    const tokenDecimals = selectedERC20Decimals;
+    const tokenSymbol = selectedERC20Symbol;
+
+    const table = document.createElement('table');
+    table.className = 'aavegotchi-table';
+
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+
+    const headers = ['Token ID', 'Name', 'Escrow Wallet', `${tokenSymbol} Balance`, 'Status', 'Rarity Farming Deposits'];
+    for (const headerText of headers) {
+      const th = document.createElement('th');
+      th.innerText = headerText;
+      headerRow.appendChild(th);
+    }
+
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+
+    const balancePromises = [];
+    const lendingStatusPromises = [];
+    const rarityFarmingDepositsPromises = [];
+    for (const aavegotchi of aavegotchis) {
+      balancePromises.push(tokenContract.balanceOf(aavegotchi.escrow));
+      lendingStatusPromises.push(contract.isAavegotchiLent(aavegotchi.tokenId));
+      rarityFarmingDepositsPromises.push(fetchRarityFarmingDeposits(aavegotchi.escrow));
+    }
+
+    const balances = await Promise.all(balancePromises);
+    const lendingStatuses = await Promise.all(lendingStatusPromises);
+    const rarityFarmingDeposits = await Promise.all(rarityFarmingDepositsPromises);
+
+    const ownedGotchis = [];
+    const rentedGotchis = [];
+
+    for (let index = 0; index < aavegotchis.length; index++) {
+      const aavegotchi = aavegotchis[index];
+      const isLent = lendingStatuses[index];
+      const isOwned = !isLent;
+
+      if (isOwned) {
+        ownedAavegotchis.push(aavegotchi);
+        ownedGotchis.push({ 
+          aavegotchi, 
+          balance: balances[index], 
+          isLent,
+rarityFarmingDeposits: rarityFarmingDeposits[index]
+        });
+      } else {
+        rentedGotchis.push({ 
+          aavegotchi, 
+          balance: balances[index], 
+          isLent,
+          rarityFarmingDeposits: rarityFarmingDeposits[index]
+        });
+      }
+    }
+
+    // Sort owned Gotchis by balance in descending order
+    ownedGotchis.sort((a, b) => b.balance > a.balance ? 1 : -1);
+
+    // Combine sorted owned Gotchis with rented Gotchis
+    const sortedGotchis = [...ownedGotchis, ...rentedGotchis];
+
+    for (const { aavegotchi, balance, isLent, rarityFarmingDeposits } of sortedGotchis) {
+      const row = document.createElement('tr');
+
+      const tokenId = aavegotchi.tokenId.toString();
+      const name = aavegotchi.name && aavegotchi.name.trim() !== '' ? aavegotchi.name : '(No Name)';
+      const escrowWallet = aavegotchi.escrow;
+      const shortEscrowWallet = `${escrowWallet.slice(0, 6)}...${escrowWallet.slice(-4)}`;
+
+      escrowBalances[escrowWallet] = {
+        tokenBalance: balance,
+        tokenSymbol: tokenSymbol,
+      };
+
+      const tokenIdCell = document.createElement('td');
+      tokenIdCell.setAttribute('data-label', 'Token ID');
+      tokenIdCell.innerText = tokenId;
+      row.appendChild(tokenIdCell);
+
+      const nameCell = document.createElement('td');
+      nameCell.setAttribute('data-label', 'Name');
+      nameCell.innerText = name;
+      row.appendChild(nameCell);
+
+      const escrowCell = document.createElement('td');
+      escrowCell.setAttribute('data-label', 'Escrow Wallet');
+      const escrowLink = document.createElement('a');
+      escrowLink.href = `https://polygonscan.com/address/${escrowWallet}`;
+      escrowLink.target = '_blank';
+      escrowLink.rel = 'noopener noreferrer';
+      escrowLink.className = 'address-link';
+      escrowLink.title = escrowWallet;
+      escrowLink.innerText = shortEscrowWallet;
+      escrowCell.appendChild(escrowLink);
+
+      const copyButton = document.createElement('button');
+      copyButton.className = 'copy-button';
+      copyButton.setAttribute('data-copy-target', escrowWallet);
+      copyButton.setAttribute('data-tooltip', 'Copy Escrow Wallet Address');
+      copyButton.innerText = '📄';
+      escrowCell.appendChild(copyButton);
+
+      row.appendChild(escrowCell);
+
+      const tokenBalanceRaw = balance;
+      const tokenBalance = ethers.formatUnits(tokenBalanceRaw, tokenDecimals);
+      const tokenBalanceCell = document.createElement('td');
+      tokenBalanceCell.setAttribute('data-label', `${tokenSymbol} Balance`);
+      
+      const tokenImage = document.createElement('img');
+      const imageUrl = await getTokenImageUrl(selectedERC20Address);
+      tokenImage.src = imageUrl;
+      tokenImage.alt = tokenSymbol;
+      tokenImage.width = 24;
+      tokenImage.height = 24;
+      tokenImage.onerror = function() {
+        this.onerror = null;
+        this.src = 'path/to/default/token/image.png'; // Use a default image path
+      };
+      
+      const tokenBalanceWrapper = document.createElement('div');
+      tokenBalanceWrapper.className = 'token-balance';
+      tokenBalanceWrapper.appendChild(tokenImage);
+      tokenBalanceWrapper.appendChild(document.createTextNode(tokenBalance));
+      
+      tokenBalanceCell.appendChild(tokenBalanceWrapper);
+      row.appendChild(tokenBalanceCell);
+
+      const statusCell = document.createElement('td');
+      statusCell.setAttribute('data-label', 'Status');
+      if (!isLent) {
+        statusCell.innerText = 'Owned';
+        statusCell.className = 'status-owned';
+      } else {
+        statusCell.innerText = 'Rented';
+        statusCell.className = 'status-rented';
+      }
+      row.appendChild(statusCell);
+
+      const rarityFarmingCell = document.createElement('td');
+      rarityFarmingCell.setAttribute('data-label', 'Rarity Farming Deposits');
+      if (rarityFarmingDeposits.length > 0) {
+        const depositList = document.createElement('ul');
+        depositList.className = 'deposit-list';
+        rarityFarmingDeposits.slice(0, 3).forEach(deposit => {
+          const listItem = document.createElement('li');
+          listItem.innerText = `${deposit.value} GHST on ${deposit.timestamp}`;
+          depositList.appendChild(listItem);
+        });
+        if (rarityFarmingDeposits.length > 3) {
+          const moreLink = document.createElement('a');
+          moreLink.href = '#';
+          moreLink.innerText = 'View more...';
+          moreLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            showAllDeposits(rarityFarmingDeposits, tokenId, name);
+          });
+          rarityFarmingCell.appendChild(moreLink);
+        }
+        rarityFarmingCell.appendChild(depositList);
+      } else {
+        rarityFarmingCell.innerText = 'No deposits';
+      }
+      row.appendChild(rarityFarmingCell);
+
+      tbody.appendChild(row);
+    }
+
+    table.appendChild(tbody);
+
+    aavegotchiInfoContainer.innerHTML = `<h2>Your Aavegotchis:</h2>`;
+    aavegotchiInfoContainer.appendChild(table);
+
+    initializeCopyButtons();
+  } catch (error) {
+    console.error('Error fetching Aavegotchis:', error);
+    aavegotchiInfoContainer.innerHTML = '<p>Error fetching Aavegotchis. See console for details.</p>';
+  }
+}
+
 // Toast Notification Functions
 function showToast(message, type = 'success') {
   const toast = document.createElement('div');
@@ -352,7 +615,7 @@ async function generateMethodForms() {
   const selectedFacet = 'EscrowFacet';
   const facetMethods = getFacetMethods(selectedFacet);
 
-if (!facetMethods) {
+  if (!facetMethods) {
     methodFormsContainer.innerHTML = '<p>No methods found for the selected facet.</p>';
     return;
   }
@@ -423,7 +686,7 @@ if (!facetMethods) {
           inputElement.appendChild(allOption);
         }
 
-        for (const aavegotchi of ownedAavegotchis) {
+for (const aavegotchi of ownedAavegotchis) {
           const option = document.createElement('option');
           option.value = aavegotchi.tokenId.toString();
           const name = aavegotchi.name && aavegotchi.name.trim() !== '' ? aavegotchi.name : '(No Name)';
@@ -687,6 +950,7 @@ function getFacetMethods(facet) {
 
   return facets[facet];
 }
+
 // Function to Handle Form Submission
 async function handleFormSubmit(event) {
   event.preventDefault();
@@ -824,7 +1088,7 @@ async function handleFormSubmit(event) {
     await generateMethodForms();
   } catch (error) {
     console.error(error);
-    showToast(`Error: ${error.info?.error?.message || error.message}`, 'error');
+showToast(`Error: ${error.info?.error?.message || error.message}`, 'error');
   } finally {
     submitButton.disabled = false;
     submitButton.innerText = 'Submit';
@@ -1005,163 +1269,6 @@ function toggleCollapse(contentElement, iconElement, expand) {
     iconElement.innerHTML = '&#9660;';
   }
 }
-// Function to Fetch and Display Aavegotchis
-async function fetchAndDisplayAavegotchis(ownerAddress) {
-  try {
-    ownedAavegotchis = [];
-    const aavegotchis = await contract.allAavegotchisOfOwner(ownerAddress);
-
-    if (aavegotchis.length === 0) {
-      aavegotchiInfoContainer.innerHTML = '<p>No Aavegotchis found for this wallet.</p>';
-      return;
-    }
-
-    const tokenContract = new ethers.Contract(selectedERC20Address, ghstABI, provider);
-    const tokenDecimals = selectedERC20Decimals;
-    const tokenSymbol = selectedERC20Symbol;
-
-    const table = document.createElement('table');
-    table.className = 'aavegotchi-table';
-
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-
-    const headers = ['Token ID', 'Name', 'Escrow Wallet', `${tokenSymbol} Balance`, 'Status'];
-    for (const headerText of headers) {
-      const th = document.createElement('th');
-      th.innerText = headerText;
-      headerRow.appendChild(th);
-    }
-
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-
-    const tbody = document.createElement('tbody');
-
-    const balancePromises = [];
-    const lendingStatusPromises = [];
-    for (const aavegotchi of aavegotchis) {
-      balancePromises.push(tokenContract.balanceOf(aavegotchi.escrow));
-      lendingStatusPromises.push(contract.isAavegotchiLent(aavegotchi.tokenId));
-    }
-
-    const balances = await Promise.all(balancePromises);
-    const lendingStatuses = await Promise.all(lendingStatusPromises);
-
-    const ownedGotchis = [];
-    const rentedGotchis = [];
-
-    for (let index = 0; index < aavegotchis.length; index++) {
-      const aavegotchi = aavegotchis[index];
-      const isLent = lendingStatuses[index];
-      const isOwned = !isLent;
-
-      if (isOwned) {
-        ownedAavegotchis.push(aavegotchi);
-        ownedGotchis.push({ aavegotchi, balance: balances[index], isLent });
-      } else {
-        rentedGotchis.push({ aavegotchi, balance: balances[index], isLent });
-      }
-    }
-
-    // Sort owned Gotchis by balance in descending order
-    ownedGotchis.sort((a, b) => b.balance > a.balance ? 1 : -1);
-
-    // Combine sorted owned Gotchis with rented Gotchis
-    const sortedGotchis = [...ownedGotchis, ...rentedGotchis];
-
-    for (const { aavegotchi, balance, isLent } of sortedGotchis) {
-      const row = document.createElement('tr');
-
-      const tokenId = aavegotchi.tokenId.toString();
-      const name = aavegotchi.name && aavegotchi.name.trim() !== '' ? aavegotchi.name : '(No Name)';
-      const escrowWallet = aavegotchi.escrow;
-      const shortEscrowWallet = `${escrowWallet.slice(0, 6)}...${escrowWallet.slice(-4)}`;
-
-      escrowBalances[escrowWallet] = {
-        tokenBalance: balance,
-        tokenSymbol: tokenSymbol,
-      };
-
-      const tokenIdCell = document.createElement('td');
-      tokenIdCell.setAttribute('data-label', 'Token ID');
-      tokenIdCell.innerText = tokenId;
-      row.appendChild(tokenIdCell);
-
-      const nameCell = document.createElement('td');
-      nameCell.setAttribute('data-label', 'Name');
-      nameCell.innerText = name;
-      row.appendChild(nameCell);
-
-      const escrowCell = document.createElement('td');
-      escrowCell.setAttribute('data-label', 'Escrow Wallet');
-      const escrowLink = document.createElement('a');
-      escrowLink.href = `https://polygonscan.com/address/${escrowWallet}`;
-      escrowLink.target = '_blank';
-      escrowLink.rel = 'noopener noreferrer';
-      escrowLink.className = 'address-link';
-      escrowLink.title = escrowWallet;
-      escrowLink.innerText = shortEscrowWallet;
-      escrowCell.appendChild(escrowLink);
-
-      const copyButton = document.createElement('button');
-      copyButton.className = 'copy-button';
-      copyButton.setAttribute('data-copy-target', escrowWallet);
-      copyButton.setAttribute('data-tooltip', 'Copy Escrow Wallet Address');
-      copyButton.innerText = '📄';
-      escrowCell.appendChild(copyButton);
-
-      row.appendChild(escrowCell);
-
-      const tokenBalanceRaw = balance;
-      const tokenBalance = ethers.formatUnits(tokenBalanceRaw, tokenDecimals);
-      const tokenBalanceCell = document.createElement('td');
-      tokenBalanceCell.setAttribute('data-label', `${tokenSymbol} Balance`);
-      
-      const tokenImage = document.createElement('img');
-      const imageUrl = await getTokenImageUrl(selectedERC20Address);
-      tokenImage.src = imageUrl;
-      tokenImage.alt = tokenSymbol;
-      tokenImage.width = 100;
-      tokenImage.height = 100;
-      tokenImage.onerror = function() {
-        this.onerror = null;
-        this.src = 'path/to/default/token/image.png'; // Use a default image path
-      };
-      
-      const tokenBalanceWrapper = document.createElement('div');
-      tokenBalanceWrapper.className = 'token-balance';
-      tokenBalanceWrapper.appendChild(tokenImage);
-      tokenBalanceWrapper.appendChild(document.createTextNode(tokenBalance));
-      
-      tokenBalanceCell.appendChild(tokenBalanceWrapper);
-      row.appendChild(tokenBalanceCell);
-
-      const statusCell = document.createElement('td');
-      statusCell.setAttribute('data-label', 'Status');
-      if (!isLent) {
-        statusCell.innerText = 'Owned';
-        statusCell.className = 'status-owned';
-      } else {
-        statusCell.innerText = 'Rented';
-        statusCell.className = 'status-rented';
-      }
-      row.appendChild(statusCell);
-
-      tbody.appendChild(row);
-    }
-
-    table.appendChild(tbody);
-
-    aavegotchiInfoContainer.innerHTML = `<h2>Your Aavegotchis:</h2>`;
-    aavegotchiInfoContainer.appendChild(table);
-
-    initializeCopyButtons();
-  } catch (error) {
-    console.error('Error fetching Aavegotchis:', error);
-    aavegotchiInfoContainer.innerHTML = '<p>Error fetching Aavegotchis. See console for details.</p>';
-  }
-}
 
 // Function to get token image URL
 const tokenImageCache = new Map();
@@ -1302,12 +1409,6 @@ async function handleMaxButtonClick(form) {
   }
 }
 
-// Initial call to generate method forms if the wallet is already connected
-window.onload = async () => {
-  if (window.ethereum && window.ethereum.selectedAddress) {
-    await connectWallet();
-  }
-};
 // Function to Refresh Table Balances Based on Selected ERC20 Token
 async function refreshTableBalances() {
   try {
@@ -1341,8 +1442,8 @@ async function refreshTableBalances() {
       const tokenImage = document.createElement('img');
       tokenImage.src = imageUrl;
       tokenImage.alt = selectedERC20Symbol;
-      tokenImage.width = 100;
-      tokenImage.height = 100;
+      tokenImage.width = 24;
+      tokenImage.height = 24;
       tokenImage.onerror = function() {
         this.onerror = null;
         this.src = 'path/to/default/token/image.png'; // Use a default image path
@@ -1399,8 +1500,7 @@ const debouncedUpdateERC20Token = debounce(async (address) => {
       } catch (error) {
         console.error('Error updating ERC20 token:', error);
         showToast('Invalid ERC20 token address.', 'error');
-      }
-    } else {
+} else {
       showToast('Invalid ERC20 address format.', 'error');
     }
   }
@@ -1574,5 +1674,12 @@ function getNetworkParams(chainId) {
   return networkParams[chainId];
 }
 
-// Add this at the end of your file
+// Initial call to generate method forms if the wallet is already connected
+window.onload = async () => {
+  if (window.ethereum && window.ethereum.selectedAddress) {
+    await connectWallet();
+  }
+};
+
 console.log('app.js loaded');
+	  
