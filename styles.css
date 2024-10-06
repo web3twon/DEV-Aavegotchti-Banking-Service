@@ -570,57 +570,6 @@ a:hover {
   margin-top: 10px;
 }
 
-/* Responsive Table */
-@media screen and (max-width: 600px) {
-  .aavegotchi-table thead {
-    display: none;
-  }
-
-  .aavegotchi-table, .aavegotchi-table tbody, .aavegotchi-table tr, .aavegotchi-table td {
-    display: block;
-    width: 100%;
-  }
-
-  .aavegotchi-table tr {
-    margin-bottom: 15px;
-  }
-
-  .aavegotchi-table td {
-    text-align: right;
-    padding-left: 50%;
-    position: relative;
-  }
-
-  .aavegotchi-table td::before {
-    content: attr(data-label);
-    position: absolute;
-    left: 0;
-    width: 50%;
-    padding-left: 15px;
-    font-weight: bold;
-    text-align: left;
-  }
-}
-
-/* Additional Styles for Add Your Own Token */
-#custom-erc20-address {
-  display: none;
-}
-
-/* Modal Form Styles */
-.modal-form {
-  display: flex;
-  flex-direction: column;
-}
-
-.modal-form .button.submit-button {
-  background: linear-gradient(135deg, var(--color-bright-pink), var(--color-vivid-purple));
-}
-
-.modal-form .button.submit-button:hover {
-  background: linear-gradient(135deg, var(--color-vivid-purple), var(--color-bright-pink));
-}
-
 /* Responsive Design Enhancements */
 @media (max-width: 1024px) {
   header, nav, main, footer {
@@ -721,19 +670,12 @@ a:hover {
 }
 
 @media (max-width: 600px) {
-  .aavegotchi-table th,
-  .aavegotchi-table td {
-    padding: 5px;
-    font-size: 12px;
+  header, nav, main, footer {
+    padding: 1rem 2%;
   }
 
-  .aavegotchi-table {
-    width: 100%;
-  }
-
-  .aavegotchi-table th,
-  .aavegotchi-table td {
-    word-break: break-word;
+  .header-left {
+    max-width: 100%;
   }
 
   header h1 {
@@ -746,7 +688,52 @@ a:hover {
 
   .aavegotchi-info {
     max-height: 300px;
+    padding: 15px;
+    overflow-x: auto;
   }
+
+  .aavegotchi-table {
+    width: 600px; /* Set a fixed width for horizontal scrolling */
+  }
+
+  .aavegotchi-table th,
+  .aavegotchi-table td {
+    padding: 5px;
+    font-size: 12px;
+  }
+
+  /* Ensure the table remains intact */
+  .aavegotchi-table thead {
+    display: table-header-group;
+  }
+
+  .aavegotchi-table tr {
+    display: table-row;
+  }
+
+  .aavegotchi-table th,
+  .aavegotchi-table td {
+    display: table-cell;
+  }
+}
+
+/* Additional Styles for Add Your Own Token */
+#custom-erc20-address {
+  display: none;
+}
+
+/* Modal Form Styles */
+.modal-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-form .button.submit-button {
+  background: linear-gradient(135deg, var(--color-bright-pink), var(--color-vivid-purple));
+}
+
+.modal-form .button.submit-button:hover {
+  background: linear-gradient(135deg, var(--color-vivid-purple), var(--color-bright-pink));
 }
 
 /* Toast Styles */

@@ -352,7 +352,7 @@ async function generateMethodForms() { // Declared as async
   const selectedFacet = 'EscrowFacet';
   const facetMethods = getFacetMethods(selectedFacet);
 
-if (!facetMethods) {
+  if (!facetMethods) {
     methodFormsContainer.innerHTML = '<p>No methods found for the selected facet.</p>';
     return;
   }
@@ -426,7 +426,8 @@ if (!facetMethods) {
         for (const aavegotchi of ownedAavegotchis) {
           const option = document.createElement('option');
           option.value = aavegotchi.tokenId.toString();
-          option.innerText = `Aavegotchi ID ${aavegotchi.tokenId} (${aavegotchi.name})`;
+          const name = aavegotchi.name && aavegotchi.name.trim() !== '' ? aavegotchi.name : '(No Name)';
+          option.innerText = `Aavegotchi ID ${aavegotchi.tokenId} (${name})`;
           inputElement.appendChild(option);
         }
 
@@ -641,7 +642,6 @@ function generateExtraTools(facetMethods, extraMethodNames) {
     });
   }
 }
-
 // Function to Get Methods for a Facet
 function getFacetMethods(facet) {
   const facets = {
@@ -736,7 +736,8 @@ async function handleFormSubmit(event) {
         const escrowWallet = gotchi.escrow;
         const balance = await tokenContract.balanceOf(escrowWallet);
         const symbol = await tokenContract.symbol();
-        return { tokenId, balance, symbol, name: gotchi.name };
+        const name = gotchi.name && gotchi.name.trim() !== '' ? gotchi.name : '(No Name)';
+        return { tokenId, balance, symbol, name };
       });
 
       const balancesResult = await Promise.all(balancePromises);
@@ -758,7 +759,7 @@ async function handleFormSubmit(event) {
         throw new Error('Invalid number for amount');
       }
 
-const decimals = await tokenContract.decimals();
+      const decimals = await tokenContract.decimals();
       const totalTransferAmount = ethers.parseUnits(transferAmountValue, decimals);
 
       if (totalTransferAmount > totalAvailableBalance) {
@@ -858,13 +859,13 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
       const tokenId = _tokenIds[index];
       const balance = individualBalances[index];
       const balanceFormatted = ethers.formatUnits(balance, decimals);
-      const aavegotchiName = aavegotchiNames[index] || 'Unnamed';
+      const name = aavegotchiNames[index] && aavegotchiNames[index].trim() !== '' ? aavegotchiNames[index] : '(No Name)';
 
       const formGroup = document.createElement('div');
       formGroup.className = 'form-group';
 
       const label = document.createElement('label');
-      label.innerText = `Aavegotchi ID ${tokenId} (${aavegotchiName}) (Balance: ${balanceFormatted} ${tokenSymbol}):`;
+      label.innerText = `Aavegotchi ID ${tokenId} (${name}) (Balance: ${balanceFormatted} ${tokenSymbol}):`;
 
       const input = document.createElement('input');
       input.type = 'number';
@@ -1008,7 +1009,7 @@ function toggleCollapse(contentElement, iconElement, expand) {
 // Function to Fetch and Display Aavegotchis
 async function fetchAndDisplayAavegotchis(ownerAddress) {
   try {
-    ownedAavegotchis = []; 
+    ownedAavegotchis = [];
     const aavegotchis = await contract.allAavegotchisOfOwner(ownerAddress);
 
     if (aavegotchis.length === 0) {
@@ -1060,7 +1061,7 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       const row = document.createElement('tr');
 
       const tokenId = aavegotchi.tokenId.toString();
-      const name = aavegotchi.name;
+      const name = aavegotchi.name && aavegotchi.name.trim() !== '' ? aavegotchi.name : '(No Name)';
       const escrowWallet = aavegotchi.escrow;
       const shortEscrowWallet = `${escrowWallet.slice(0, 6)}...${escrowWallet.slice(-4)}`;
 
@@ -1165,7 +1166,7 @@ async function updateMaxButton(form) {
   const tokenIdValue = tokenIdSelect ? tokenIdSelect.value : null;
   let erc20Address = erc20ContractSelect ? erc20ContractSelect.value : null;
 
-if (erc20Address === 'custom') {
+  if (erc20Address === 'custom') {
     erc20Address = customErc20Input ? customErc20Input.value : null;
   }
 
