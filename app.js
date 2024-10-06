@@ -1500,7 +1500,8 @@ const debouncedUpdateERC20Token = debounce(async (address) => {
       } catch (error) {
         console.error('Error updating ERC20 token:', error);
         showToast('Invalid ERC20 token address.', 'error');
-} else {
+      }
+    } else {
       showToast('Invalid ERC20 address format.', 'error');
     }
   }
