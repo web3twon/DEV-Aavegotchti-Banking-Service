@@ -788,12 +788,15 @@ a:hover {
 .token-balance {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+}
+
+.token-balance span {
+  margin-right: 10px;
 }
 
 .token-balance img {
-  width: 24px;
-  height: 24px;
-  margin-right: 8px;
-  vertical-align: middle;
-  border-radius: 50%;
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
 }
