@@ -1118,13 +1118,6 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       const tokenBalanceCell = document.createElement('td');
       tokenBalanceCell.setAttribute('data-label', `${tokenSymbol} Balance`);
       
-      const tokenBalanceWrapper = document.createElement('div');
-      tokenBalanceWrapper.className = 'token-balance';
-
-      const balanceText = document.createElement('span');
-      balanceText.textContent = tokenBalance;
-      tokenBalanceWrapper.appendChild(balanceText);
-
       const tokenImage = document.createElement('img');
       const imageUrl = await getTokenImageUrl(selectedERC20Address);
       tokenImage.src = imageUrl;
@@ -1135,7 +1128,11 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
         this.onerror = null;
         this.src = 'path/to/default/token/image.png'; // Use a default image path
       };
+      
+      const tokenBalanceWrapper = document.createElement('div');
+      tokenBalanceWrapper.className = 'token-balance';
       tokenBalanceWrapper.appendChild(tokenImage);
+      tokenBalanceWrapper.appendChild(document.createTextNode(tokenBalance));
       
       tokenBalanceCell.appendChild(tokenBalanceWrapper);
       row.appendChild(tokenBalanceCell);
@@ -1353,21 +1350,8 @@ async function refreshTableBalances() {
       
       const tokenBalanceWrapper = document.createElement('div');
       tokenBalanceWrapper.className = 'token-balance';
-      
-      const balanceText = document.createElement('span');
-      balanceText.textContent = formattedBalance;
-      tokenBalanceWrapper.appendChild(balanceText);
-      
-      const tokenImage = document.createElement('img');
-      tokenImage.src = imageUrl;
-      tokenImage.alt = selectedERC20Symbol;
-      tokenImage.width = 100;
-      tokenImage.height = 100;
-      tokenImage.onerror = function() {
-          this.onerror = null;
-          this.src = 'path/to/default/token/image.png'; // Use a default image path
-      };
       tokenBalanceWrapper.appendChild(tokenImage);
+      tokenBalanceWrapper.appendChild(document.createTextNode(formattedBalance));
       
       balanceCell.innerHTML = '';
       balanceCell.appendChild(tokenBalanceWrapper);

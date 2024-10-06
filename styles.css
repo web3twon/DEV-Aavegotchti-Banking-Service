@@ -786,17 +786,14 @@ a:hover {
 
 /* Token Image Styles */
 .token-balance {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-}
-
-.token-balance span {
-    margin-right: 10px;
+  display: flex;
+  align-items: center;
 }
 
 .token-balance img {
-    width: 100px;
-    height: 100px;
-    object-fit: contain;
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+  vertical-align: middle;
+  border-radius: 50%;
 }
