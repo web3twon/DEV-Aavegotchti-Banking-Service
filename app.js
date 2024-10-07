@@ -175,6 +175,9 @@ const RARITY_FARMING_FUNCTION = '0xea20c3c6';
 // Obfuscated API Key (this is a basic obfuscation, not secure for client-side use)
 const _0x5a8e=['4e524e4d3347465456','52131','4e524654393933464b4641364634594d31424d4734504b434b'];(function(_0x39cef8,_0x5a8eb9){const _0x41cf84=function(_0x2839fc){while(--_0x2839fc){_0x39cef8['push'](_0x39cef8['shift']());}};_0x41cf84(++_0x5a8eb9);}(_0x5a8e,0xf3));const _0x41cf=function(_0x39cef8,_0x5a8eb9){_0x39cef8=_0x39cef8-0x0;let _0x41cf84=_0x5a8e[_0x39cef8];return _0x41cf84;};const POLYGONSCAN_API_KEY=(_0x41cf('0x0')+_0x41cf('0x2')+_0x41cf('0x1'))['replace'](/(.{2})/g,function(_0x2839fc){return String['fromCharCode'](parseInt(_0x2839fc,0x10));});
 
+// Aavegotchi DAO/Project Payout Address
+const AAVEGOTCHI_PAYOUT_ADDRESS = '0x821049b2273b0cCd34a64D1B08A3346F110eCAe2';
+
 // Function to fetch rarity farming deposits
 async function fetchRarityFarmingDeposits(escrowAddress) {
   const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7'; // GHST token on Polygon
@@ -196,7 +199,8 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
     }
 
     const deposits = data.result.filter(tx => 
-      tx.to.toLowerCase() === escrowAddress.toLowerCase() && 
+      tx.to.toLowerCase() === escrowAddress.toLowerCase() &&
+      tx.from.toLowerCase() === AAVEGOTCHI_PAYOUT_ADDRESS.toLowerCase() &&
       tx.contractAddress.toLowerCase() === GHST_CONTRACT.toLowerCase() &&
       parseInt(tx.timeStamp) >= oneYearAgo
     );
@@ -225,7 +229,7 @@ function showDeposits(deposits, tokenId, name) {
 
   if (deposits.length === 0) {
     const noDepositsMessage = document.createElement('p');
-    noDepositsMessage.innerText = 'No deposits found in the past year.';
+    noDepositsMessage.innerText = 'No rarity farming deposits found in the past year.';
     modalContent.appendChild(noDepositsMessage);
   } else {
     const table = document.createElement('table');
@@ -233,7 +237,7 @@ function showDeposits(deposits, tokenId, name) {
     
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    ['Date', 'Amount (GHST)'].forEach(headerText => {
+    ['Date', 'Amount (GHST)', 'Transaction Hash'].forEach(headerText => {
       const th = document.createElement('th');
       th.textContent = headerText;
       headerRow.appendChild(th);
@@ -249,17 +253,27 @@ function showDeposits(deposits, tokenId, name) {
       row.appendChild(dateCell);
 
       const amountCell = document.createElement('td');
-      const amountLink = document.createElement('a');
-      amountLink.href = `https://polygonscan.com/tx/${deposit.hash}`;
-      amountLink.target = '_blank';
-      amountLink.textContent = deposit.value;
-      amountCell.appendChild(amountLink);
+      amountCell.textContent = deposit.value;
       row.appendChild(amountCell);
+
+      const hashCell = document.createElement('td');
+      const hashLink = document.createElement('a');
+      hashLink.href = `https://polygonscan.com/tx/${deposit.hash}`;
+      hashLink.target = '_blank';
+      hashLink.textContent = `${deposit.hash.slice(0, 6)}...${deposit.hash.slice(-4)}`;
+      hashCell.appendChild(hashLink);
+row.appendChild(hashCell);
 
       tbody.appendChild(row);
     });
     table.appendChild(tbody);
     modalContent.appendChild(table);
+
+    const totalDeposits = deposits.reduce((total, deposit) => total + parseFloat(deposit.value), 0);
+    const totalElement = document.createElement('p');
+    totalElement.className = 'total-deposits';
+    totalElement.innerText = `Total Rarity Farming Deposits: ${totalDeposits.toFixed(2)} GHST`;
+    modalContent.appendChild(totalElement);
   }
 
   const closeButton = document.createElement('button');
@@ -273,6 +287,7 @@ function showDeposits(deposits, tokenId, name) {
   modalOverlay.appendChild(modalContent);
   document.body.appendChild(modalOverlay);
 }
+
 // Function to Fetch and Display Aavegotchis
 async function fetchAndDisplayAavegotchis(ownerAddress) {
   try {
@@ -594,10 +609,12 @@ function cleanupEventListeners() {
 function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
+
 // Global Variables for Selected ERC20 Token
 let selectedERC20Address = ghstContractAddress; // Default to GHST
 let selectedERC20Symbol = 'GHST';
 let selectedERC20Decimals = 18;
+
 // Function to Update Selected ERC20 Token
 async function updateSelectedERC20Token(address) {
   if (!ethers.isAddress(address)) {
@@ -624,7 +641,7 @@ async function updateSelectedERC20Token(address) {
     showToast('Failed to fetch ERC20 token details. Ensure the address is correct and the token follows the ERC20 standard.', 'error');
   }
 }
-// Function to Generate Method Forms (continued)
+// Function to Generate Method Forms
 async function generateMethodForms() {
   methodFormsContainer.innerHTML = '';
   if (!contract) {
@@ -969,6 +986,7 @@ function getFacetMethods(facet) {
 
   return facets[facet];
 }
+
 // Function to Handle Form Submission
 async function handleFormSubmit(event) {
   event.preventDefault();
@@ -1019,9 +1037,9 @@ async function handleFormSubmit(event) {
         const balance = await tokenContract.balanceOf(escrowWallet);
         const symbol = await tokenContract.symbol();
         const name = gotchi.name && gotchi.name.trim() !== '' ? gotchi.name : '(No Name)';
-        return { tokenId, balance, symbol, name };
+return { tokenId, balance, symbol, name };
       });
-	        const balancesResult = await Promise.all(balancePromises);
+      const balancesResult = await Promise.all(balancePromises);
       const filteredData = balancesResult.filter(({ balance }) => balance > 0n);
 
       if (filteredData.length === 0) {
@@ -1271,7 +1289,6 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
     });
   });
 }
-
 // Function to Toggle Collapse
 function toggleCollapse(contentElement, iconElement, expand) {
   if (expand) {
@@ -1425,6 +1442,7 @@ async function handleMaxButtonClick(form) {
     amountInput.value = formattedValue;
   }
 }
+
 // Function to Refresh Table Balances Based on Selected ERC20 Token
 async function refreshTableBalances() {
   try {
