@@ -173,12 +173,97 @@ connectWalletButton.addEventListener('click', connectWallet);
 
 // Constants for Rarity Farming
 const RARITY_FARMING_FUNCTION = '0xea20c3c6';
-
 // Obfuscated API Key (this is a basic obfuscation, not secure for client-side use)
 const _0x5a8e=['4e524e4d3347465456','52131','4e524654393933464b4641364634594d31424d4734504b434b'];(function(_0x39cef8,_0x5a8eb9){const _0x41cf84=function(_0x2839fc){while(--_0x2839fc){_0x39cef8['push'](_0x39cef8['shift']());}};_0x41cf84(++_0x5a8eb9);}(_0x5a8e,0xf3));const _0x41cf=function(_0x39cef8,_0x5a8eb9){_0x39cef8=_0x39cef8-0x0;let _0x41cf84=_0x5a8e[_0x39cef8];return _0x41cf84;};const POLYGONSCAN_API_KEY=(_0x41cf('0x0')+_0x41cf('0x2')+_0x41cf('0x1'))['replace'](/(.{2})/g,function(_0x2839fc){return String['fromCharCode'](parseInt(_0x2839fc,0x10));});
 
 // Function to fetch rarity farming deposits
 async function fetchRarityFarmingDeposits(escrowAddress) {
+  const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7'; // GHST token on Polygon
+  const currentTime = Math.floor(Date.now() / 1000);
+  const oneYearAgo = currentTime - 365 * 24 * 60 * 60;
+  const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.status === '0' && data.message === 'No transactions found') {
+      console.log(`No transactions found for address: ${escrowAddress}`);
+      return [];
+    }
+
+    if (data.status !== '1') {
+      throw new Error(`API request failed: ${data.message}`);
+    }
+
+    const deposits = data.result.filter(tx => 
+      tx.to.toLowerCase() === escrowAddress.toLowerCase() && 
+      tx.contractAddress.toLowerCase() === GHST_CONTRACT.toLowerCase() &&
+      parseInt(tx.timeStamp) >= oneYearAgo
+    );
+
+    return deposits.map(tx => ({
+      hash: tx.hash,
+      value: ethers.formatUnits(tx.value, 18),
+      timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleString()
+    }));
+  } catch (error) {
+    console.error('Error fetching rarity farming deposits:', error);
+    return [];
+  }
+}
+
+// Function to show deposits in a modal
+function showDeposits(deposits, tokenId, name) {
+  const modalOverlay = document.createElement('div');
+  modalOverlay.className = 'modal-overlay';
+
+  const modalContent = document.createElement('div');
+  modalContent.className = 'modal-content';
+
+  const modalTitle = document.createElement('h2');
+  modalTitle.innerText = `Rarity Farming Deposits for Aavegotchi #${tokenId} (${name})`;
+  modalContent.appendChild(modalTitle);
+
+  if (deposits.length === 0) {
+    const noDepositsMessage = document.createElement('p');
+    noDepositsMessage.innerText = 'No deposits found in the past year.';
+    modalContent.appendChild(noDepositsMessage);
+  } else {
+    const depositList = document.createElement('ul');
+    depositList.className = 'deposit-list';
+    deposits.forEach(deposit => {
+      const listItem = document.createElement('li');
+      listItem.innerHTML = `<a href="https://polygonscan.com/tx/${deposit.hash}" target="_blank">${deposit.value} GHST on ${deposit.timestamp}</a>`;
+      depositList.appendChild(listItem);
+    });
+    modalContent.appendChild(depositList);
+  }
+
+  const showAllButton = document.createElement('button');
+  showAllButton.className = 'button';
+  showAllButton.innerText = 'Show All Deposits';
+  showAllButton.addEventListener('click', async () => {
+    modalContent.removeChild(showAllButton);
+    const allDeposits = await fetchAllRarityFarmingDeposits(escrowAddress);
+    showDeposits(allDeposits, tokenId, name);
+  });
+  modalContent.appendChild(showAllButton);
+
+  const closeButton = document.createElement('button');
+  closeButton.className = 'button';
+  closeButton.innerText = 'Close';
+  closeButton.addEventListener('click', () => {
+    document.body.removeChild(modalOverlay);
+  });
+  modalContent.appendChild(closeButton);
+
+  modalOverlay.appendChild(modalContent);
+  document.body.appendChild(modalOverlay);
+}
+
+// Function to fetch all rarity farming deposits
+async function fetchAllRarityFarmingDeposits(escrowAddress) {
   const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7'; // GHST token on Polygon
   const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
 
@@ -206,44 +291,10 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
       timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleString()
     }));
   } catch (error) {
-    console.error('Error fetching rarity farming deposits:', error);
+    console.error('Error fetching all rarity farming deposits:', error);
     return [];
   }
 }
-
-// Function to show all deposits in a modal
-function showAllDeposits(deposits, tokenId, name) {
-  const modalOverlay = document.createElement('div');
-  modalOverlay.className = 'modal-overlay';
-
-  const modalContent = document.createElement('div');
-  modalContent.className = 'modal-content';
-
-  const modalTitle = document.createElement('h2');
-  modalTitle.innerText = `All Rarity Farming Deposits for Aavegotchi #${tokenId} (${name})`;
-  modalContent.appendChild(modalTitle);
-
-  const depositList = document.createElement('ul');
-  depositList.className = 'deposit-list';
-  deposits.forEach(deposit => {
-    const listItem = document.createElement('li');
-    listItem.innerText = `${deposit.value} GHST on ${deposit.timestamp}`;
-    depositList.appendChild(listItem);
-  });
-  modalContent.appendChild(depositList);
-
-  const closeButton = document.createElement('button');
-  closeButton.className = 'button';
-  closeButton.innerText = 'Close';
-  closeButton.addEventListener('click', () => {
-    document.body.removeChild(modalOverlay);
-  });
-  modalContent.appendChild(closeButton);
-
-  modalOverlay.appendChild(modalContent);
-  document.body.appendChild(modalOverlay);
-}
-
 // Function to Fetch and Display Aavegotchis
 async function fetchAndDisplayAavegotchis(ownerAddress) {
   try {
@@ -265,7 +316,7 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
 
-    const headers = ['Token ID', 'Name', 'Escrow Wallet', `${tokenSymbol} Balance`, 'Status', 'Rarity Farming Deposits'];
+    const headers = ['Token ID', 'Name', 'Escrow Wallet', `${tokenSymbol} Balance`, 'Status'];
     for (const headerText of headers) {
       const th = document.createElement('th');
       th.innerText = headerText;
@@ -279,22 +330,18 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
 
     const balancePromises = [];
     const lendingStatusPromises = [];
-    const rarityFarmingDepositsPromises = [];
     for (const aavegotchi of aavegotchis) {
-      console.log(`Fetching deposits for Aavegotchi #${aavegotchi.tokenId}, Escrow: ${aavegotchi.escrow}`);
       balancePromises.push(tokenContract.balanceOf(aavegotchi.escrow));
       lendingStatusPromises.push(contract.isAavegotchiLent(aavegotchi.tokenId));
-      rarityFarmingDepositsPromises.push(fetchRarityFarmingDeposits(aavegotchi.escrow));
     }
 
     const balances = await Promise.all(balancePromises);
     const lendingStatuses = await Promise.all(lendingStatusPromises);
-    const rarityFarmingDeposits = await Promise.all(rarityFarmingDepositsPromises);
 
     const ownedGotchis = [];
     const rentedGotchis = [];
 
-for (let index = 0; index < aavegotchis.length; index++) {
+    for (let index = 0; index < aavegotchis.length; index++) {
       const aavegotchi = aavegotchis[index];
       const isLent = lendingStatuses[index];
       const isOwned = !isLent;
@@ -304,15 +351,13 @@ for (let index = 0; index < aavegotchis.length; index++) {
         ownedGotchis.push({ 
           aavegotchi, 
           balance: balances[index], 
-          isLent,
-          rarityFarmingDeposits: rarityFarmingDeposits[index]
+          isLent
         });
       } else {
         rentedGotchis.push({ 
           aavegotchi, 
           balance: balances[index], 
-          isLent,
-          rarityFarmingDeposits: rarityFarmingDeposits[index]
+          isLent
         });
       }
     }
@@ -323,7 +368,7 @@ for (let index = 0; index < aavegotchis.length; index++) {
     // Combine sorted owned Gotchis with rented Gotchis
     const sortedGotchis = [...ownedGotchis, ...rentedGotchis];
 
-    for (const { aavegotchi, balance, isLent, rarityFarmingDeposits } of sortedGotchis) {
+    for (const { aavegotchi, balance, isLent } of sortedGotchis) {
       const row = document.createElement('tr');
 
       const tokenId = aavegotchi.tokenId.toString();
@@ -364,6 +409,20 @@ for (let index = 0; index < aavegotchis.length; index++) {
       copyButton.innerText = '📄';
       escrowCell.appendChild(copyButton);
 
+      const rarityFarmingButton = document.createElement('button');
+      rarityFarmingButton.className = 'rarity-farming-button';
+      rarityFarmingButton.setAttribute('data-escrow-address', escrowWallet);
+      rarityFarmingButton.setAttribute('data-token-id', tokenId);
+      rarityFarmingButton.setAttribute('data-gotchi-name', name);
+      rarityFarmingButton.setAttribute('data-tooltip', 'View Rarity Farming Deposits');
+      rarityFarmingButton.innerText = '💰';
+      escrowCell.appendChild(rarityFarmingButton);
+
+      rarityFarmingButton.addEventListener('click', async () => {
+        const deposits = await fetchRarityFarmingDeposits(escrowWallet);
+        showDeposits(deposits, tokenId, name);
+      });
+
       row.appendChild(escrowCell);
 
       const tokenBalanceRaw = balance;
@@ -401,33 +460,6 @@ for (let index = 0; index < aavegotchis.length; index++) {
       }
       row.appendChild(statusCell);
 
-      const rarityFarmingCell = document.createElement('td');
-      rarityFarmingCell.setAttribute('data-label', 'Rarity Farming Deposits');
-      console.log(`Aavegotchi #${aavegotchi.tokenId} has ${rarityFarmingDeposits.length} deposits`);
-      if (rarityFarmingDeposits.length > 0) {
-        const depositList = document.createElement('ul');
-        depositList.className = 'deposit-list';
-        rarityFarmingDeposits.slice(0, 3).forEach(deposit => {
-          const listItem = document.createElement('li');
-          listItem.innerText = `${deposit.value} GHST on ${deposit.timestamp}`;
-          depositList.appendChild(listItem);
-        });
-        if (rarityFarmingDeposits.length > 3) {
-          const moreLink = document.createElement('a');
-          moreLink.href = '#';
-          moreLink.innerText = 'View more...';
-          moreLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            showAllDeposits(rarityFarmingDeposits, tokenId, name);
-          });
-          rarityFarmingCell.appendChild(moreLink);
-        }
-        rarityFarmingCell.appendChild(depositList);
-      } else {
-        rarityFarmingCell.innerText = 'No deposits';
-      }
-      row.appendChild(rarityFarmingCell);
-
       tbody.appendChild(row);
     }
 
@@ -442,7 +474,6 @@ for (let index = 0; index < aavegotchis.length; index++) {
     aavegotchiInfoContainer.innerHTML = '<p>Error fetching Aavegotchis. See console for details.</p>';
   }
 }
-
 // Toast Notification Functions
 function showToast(message, type = 'success') {
   const toast = document.createElement('div');
@@ -484,13 +515,13 @@ async function connectWallet() {
 
     const shortAddress = `${address.slice(0, 6)}...${address.slice(-4)}`;
 
-    walletInfo.innerHTML = `
-      <p>Connected Wallet Address: 
+    walletInfo.innerHTML = 
+      `<p>Connected Wallet Address: 
         <a href="https://polygonscan.com/address/${address}" target="_blank" rel="noopener noreferrer" class="address-link" title="${address}">
           ${shortAddress}
         </a>
-      </p>
-    `;
+      </p>`
+    ;
 
     const network = await provider.getNetwork();
     let networkName = 'Unknown';
@@ -585,7 +616,6 @@ function capitalizeFirstLetter(string) {
 let selectedERC20Address = ghstContractAddress; // Default to GHST
 let selectedERC20Symbol = 'GHST';
 let selectedERC20Decimals = 18;
-
 // Function to Update Selected ERC20 Token
 async function updateSelectedERC20Token(address) {
   if (!ethers.isAddress(address)) {
@@ -675,7 +705,7 @@ async function generateMethodForms() {
         } else {
           label.innerText = `${input.name} (${input.type}):`;
         }
-} else {
+      } else {
         label.innerText = `${input.name} (${input.type}):`;
       }
 
@@ -805,7 +835,6 @@ async function generateMethodForms() {
 
   generateExtraTools(facetMethods, extraMethodNames);
 }
-
 // Function to Generate Extra Tools
 function generateExtraTools(facetMethods, extraMethodNames) {
   if (extraMethodNames.length > 0) {
@@ -959,7 +988,6 @@ function getFacetMethods(facet) {
 
   return facets[facet];
 }
-
 // Function to Handle Form Submission
 async function handleFormSubmit(event) {
   event.preventDefault();
@@ -1081,7 +1109,7 @@ async function handleFormSubmit(event) {
         throw new Error('Invalid number for amount');
       }
 
-const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
+      const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
       const decimals = await tokenContract.decimals();
       const transferAmount = ethers.parseUnits(transferAmountValue, decimals);
 
@@ -1263,7 +1291,6 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
     });
   });
 }
-
 // Function to Toggle Collapse
 function toggleCollapse(contentElement, iconElement, expand) {
   if (expand) {
@@ -1283,21 +1310,21 @@ function toggleCollapse(contentElement, iconElement, expand) {
 const tokenImageCache = new Map();
 
 async function getTokenImageUrl(tokenAddress) {
-    if (tokenImageCache.has(tokenAddress)) {
-        return tokenImageCache.get(tokenAddress);
-    }
+  if (tokenImageCache.has(tokenAddress)) {
+    return tokenImageCache.get(tokenAddress);
+  }
 
-    try {
-        const response = await fetch(`https://api.coingecko.com/api/v3/coins/polygon-pos/contract/${tokenAddress}`);
-        if (!response.ok) throw new Error('Failed to fetch token data');
-        const data = await response.json();
-        const imageUrl = data.image.small;
-        tokenImageCache.set(tokenAddress, imageUrl);
-        return imageUrl;
-    } catch (error) {
-        console.error('Error fetching token image:', error);
-        return 'path/to/default/token/image.png'; // Use a default image path
-    }
+  try {
+    const response = await fetch(`https://api.coingecko.com/api/v3/coins/polygon-pos/contract/${tokenAddress}`);
+    if (!response.ok) throw new Error('Failed to fetch token data');
+    const data = await response.json();
+    const imageUrl = data.image.small;
+    tokenImageCache.set(tokenAddress, imageUrl);
+    return imageUrl;
+  } catch (error) {
+    console.error('Error fetching token image:', error);
+    return 'path/to/default/token/image.png'; // Use a default image path
+  }
 }
 
 // Function to Initialize Copy Button Event Listeners
@@ -1422,7 +1449,7 @@ async function handleMaxButtonClick(form) {
 async function refreshTableBalances() {
   try {
     const rows = document.querySelectorAll('.aavegotchi-table tbody tr');
-    
+
     if (!selectedERC20Address || !ethers.isAddress(selectedERC20Address)) {
       // If no valid ERC20 address is selected, clear the balances
       rows.forEach(row => {
@@ -1447,7 +1474,7 @@ async function refreshTableBalances() {
       const row = rows[index];
       const balanceCell = row.querySelector('td:nth-child(4)');
       const formattedBalance = ethers.formatUnits(balances[index], selectedERC20Decimals);
-      
+
       const tokenImage = document.createElement('img');
       tokenImage.src = imageUrl;
       tokenImage.alt = selectedERC20Symbol;
@@ -1457,12 +1484,12 @@ async function refreshTableBalances() {
         this.onerror = null;
         this.src = 'path/to/default/token/image.png'; // Use a default image path
       };
-      
+
       const tokenBalanceWrapper = document.createElement('div');
       tokenBalanceWrapper.className = 'token-balance';
       tokenBalanceWrapper.appendChild(tokenImage);
       tokenBalanceWrapper.appendChild(document.createTextNode(formattedBalance));
-      
+
       balanceCell.innerHTML = '';
       balanceCell.appendChild(tokenBalanceWrapper);
     }
@@ -1470,15 +1497,6 @@ async function refreshTableBalances() {
     console.error('Error refreshing table balances:', error);
     showToast('Failed to refresh token balances.', 'error');
   }
-}
-
-// Function to validate and format ERC20 address input
-function validateAndFormatERC20Address(input) {
-  const address = input.trim();
-  if (ethers.isAddress(address)) {
-    return ethers.getAddress(address); // This returns the checksum address
-  }
-  return null;
 }
 
 // Debounce function
@@ -1514,13 +1532,13 @@ const debouncedUpdateERC20Token = debounce(async (address) => {
       showToast('Invalid ERC20 address format.', 'error');
     }
   }
-  
+
   // Update table header
   const tableHeader = document.querySelector('.aavegotchi-table th:nth-child(4)');
   if (tableHeader) {
     tableHeader.innerText = `${selectedERC20Symbol} Balance`;
   }
-  
+
   // Refresh table balances
   await refreshTableBalances();
 }, 500); // 500ms debounce time
@@ -1533,155 +1551,19 @@ document.addEventListener('input', (event) => {
   }
 });
 
+// Function to validate and format ERC20 address input
+function validateAndFormatERC20Address(input) {
+  const address = input.trim();
+  if (ethers.isAddress(address)) {
+    return ethers.getAddress(address); // This returns the checksum address
+  }
+  return null;
+}
+
 // Error handling function
 function handleError(error) {
   console.error('An error occurred:', error);
   showToast(`Error: ${error.message || 'Unknown error occurred'}`, 'error');
-}
-
-// Function to format large numbers with commas
-function formatNumberWithCommas(number) {
-  return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
-
-// Function to shorten addresses
-function shortenAddress(address) {
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
-
-// Function to get token metadata
-async function getTokenMetadata(tokenAddress) {
-  try {
-    const response = await fetch(`https://api.coingecko.com/api/v3/coins/polygon-pos/contract/${tokenAddress}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch token metadata');
-    }
-    const data = await response.json();
-    return {
-      name: data.name,
-      symbol: data.symbol,
-      decimals: data.detail_platforms["polygon-pos"].decimal_place,
-      image: data.image.small
-    };
-  } catch (error) {
-    console.error('Error fetching token metadata:', error);
-    return null;
-  }
-}
-
-// Function to update UI with token metadata
-async function updateTokenMetadata(tokenAddress) {
-  const metadata = await getTokenMetadata(tokenAddress);
-  if (metadata) {
-    selectedERC20Symbol = metadata.symbol;
-    selectedERC20Decimals = metadata.decimals;
-    // Update any UI elements that display token information
-    const tokenInfoElement = document.getElementById('token-info');
-    if (tokenInfoElement) {
-      tokenInfoElement.innerHTML = `
-        <img src="${metadata.image}" alt="${metadata.name}" width="24" height="24">
-        <span>${metadata.name} (${metadata.symbol})</span>
-      `;
-    }
-  }
-}
-
-// Function to calculate and display gas estimates
-async function estimateGas(methodName, args) {
-  try {
-    const gasEstimate = await contract.estimateGas[methodName](...args);
-    const gasPriceWei = await provider.getGasPrice();
-    const gasPrice = ethers.formatUnits(gasPriceWei, 'gwei');
-    const totalCost = gasEstimate * gasPriceWei;
-    const totalCostEth = ethers.formatEther(totalCost);
-    
-    const gasInfoElement = document.getElementById('gas-info');
-    if (gasInfoElement) {
-      gasInfoElement.innerHTML = `
-        Estimated Gas: ${formatNumberWithCommas(gasEstimate)} units<br>
-        Gas Price: ${parseFloat(gasPrice).toFixed(2)} Gwei<br>
-        Estimated Total Cost: ${parseFloat(totalCostEth).toFixed(6)} ETH
-      `;
-    }
-  } catch (error) {
-    console.error('Error estimating gas:', error);
-    showToast('Failed to estimate gas cost', 'error');
-  }
-}
-
-// Function to update the UI based on network changes
-async function updateUIForNetwork() {
-  const network = await provider.getNetwork();
-  const networkName = getNetworkName(network.chainId);
-  document.getElementById('network-name').textContent = networkName;
-  // You can add more UI updates based on the network here
-}
-
-// Helper function to get network name from chain ID
-function getNetworkName(chainId) {
-  const networks = {
-    1: 'Ethereum Mainnet',
-    3: 'Ropsten Testnet',
-    4: 'Rinkeby Testnet',
-    5: 'Goerli Testnet',
-    42: 'Kovan Testnet',
-    137: 'Polygon Mainnet',
-    80001: 'Mumbai Testnet'
-  };
-  return networks[chainId] || 'Unknown Network';
-}
-
-// Event listener for network changes
-if (window.ethereum) {
-  window.ethereum.on('chainChanged', (chainId) => {
-    window.location.reload();
-  });
-}
-
-// Function to switch networks
-async function switchNetwork(chainId) {
-  try {
-    await window.ethereum.request({
-      method: 'wallet_switchEthereumChain',
-      params: [{ chainId: ethers.utils.hexValue(chainId) }],
-    });
-  } catch (switchError) {
-    // This error code indicates that the chain has not been added to MetaMask.
-    if (switchError.code === 4902) {
-      try {
-        await window.ethereum.request({
-          method: 'wallet_addEthereumChain',
-          params: [getNetworkParams(chainId)],
-        });
-      } catch (addError) {
-        console.error('Failed to add network:', addError);
-        showToast('Failed to add network to MetaMask', 'error');
-      }
-    } else {
-      console.error('Failed to switch network:', switchError);
-      showToast('Failed to switch network', 'error');
-    }
-  }
-}
-
-// Helper function to get network parameters
-function getNetworkParams(chainId) {
-  // Define network parameters for different chains
-  const networkParams = {
-    137: {
-      chainId: '0x89',
-      chainName: 'Polygon Mainnet',
-      nativeCurrency: {
-        name: 'MATIC',
-        symbol: 'MATIC',
-        decimals: 18
-      },
-      rpcUrls: ['https://polygon-rpc.com/'],
-      blockExplorerUrls: ['https://polygonscan.com/']
-    },
-    // Add more network configurations as needed
-  };
-  return networkParams[chainId];
 }
 
 // Initial call to generate method forms if the wallet is already connected

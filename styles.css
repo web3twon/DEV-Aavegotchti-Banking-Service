@@ -298,6 +298,49 @@ a:hover {
   visibility: visible;
 }
 
+/* New Styles for Rarity Farming Emoji */
+.rarity-farming-button {
+  background: none;
+  border: none;
+  color: #FFD700;
+  cursor: pointer;
+  margin-left: 5px;
+  font-size: 16px;
+  transition: color var(--transition-speed);
+  padding: 10px;
+  position: relative;
+}
+
+.rarity-farming-button:hover {
+  color: #FFD700;
+}
+
+.rarity-farming-button:focus {
+  outline: none;
+}
+
+.rarity-farming-button::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #1c0124;
+  color: #fff;
+  padding: 5px 10px;
+  border-radius: 6px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition-speed);
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.rarity-farming-button:hover::after {
+  opacity: 1;
+  visibility: visible;
+}
+
 /* Form Wrapper */
 .form-wrapper {
   max-width: var(--max-form-width);
@@ -478,20 +521,6 @@ a:hover {
 .modal-content .instruction {
   margin-bottom: 20px;
   font-size: 18px;
-}
-
-.modal-content .total-display {
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 20px;
-}
-
-.total-display.correct {
-  color: #28a745; /* Green */
-}
-
-.total-display.incorrect {
-  color: #dc3545; /* Red */
 }
 
 .modal-form .form-group {
