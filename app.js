@@ -177,18 +177,17 @@ const _0x5a8e=['4e524e4d3347465456','52131','4e524654393933464b4641364634594d314
 
 // Function to fetch rarity farming deposits
 async function fetchRarityFarmingDeposits(escrowAddress) {
-  const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7';
   const BATCH_DEPOSIT_GHST_SIGNATURE = '0xea20c3c6';
   const currentTime = Math.floor(Date.now() / 1000);
   const oneYearAgo = currentTime - 365 * 24 * 60 * 60;
   
-  // Fetch internal transactions to identify batch deposits
-  const internalTxUrl = `https://api.polygonscan.com/api?module=account&action=txlistinternal&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
+  // Fetch normal transactions
+  const txUrl = `https://api.polygonscan.com/api?module=account&action=txlist&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
 
-  console.log('Fetching internal transactions for escrow address:', escrowAddress);
+  console.log('Fetching transactions for escrow address:', escrowAddress);
 
   try {
-    const response = await fetch(internalTxUrl);
+    const response = await fetch(txUrl);
     const data = await response.json();
 
     console.log('API Response:', data);
@@ -203,7 +202,7 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
     }
 
     const batchDeposits = data.result.filter(tx => {
-      const isBatchDeposit = tx.input && tx.input.startsWith(BATCH_DEPOSIT_GHST_SIGNATURE);
+      const isBatchDeposit = tx.input.startsWith(BATCH_DEPOSIT_GHST_SIGNATURE);
       const isWithinOneYear = parseInt(tx.timeStamp) >= oneYearAgo;
       
       console.log('Transaction:', tx.hash);
@@ -215,35 +214,15 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
 
     console.log('Filtered batch deposits:', batchDeposits);
 
-    // Fetch GHST transfer details for each batch deposit
-    const depositDetails = await Promise.all(batchDeposits.map(async (tx) => {
-      const tokenTxUrl = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&contractaddress=${GHST_CONTRACT}&txhash=${tx.hash}&sort=asc&apikey=${POLYGONSCAN_API_KEY}`;
-      const tokenTxResponse = await fetch(tokenTxUrl);
-      const tokenTxData = await tokenTxResponse.json();
-      
-      console.log('Token transfer data for tx:', tx.hash, tokenTxData);
-      
-      const ghstTransfer = tokenTxData.result.find(transfer => 
-        transfer.to.toLowerCase() === escrowAddress.toLowerCase()
-      );
-
-      if (ghstTransfer) {
-        return {
-          hash: tx.hash,
-          value: parseFloat(ethers.formatUnits(ghstTransfer.value, 18)).toFixed(2),
-          timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleDateString()
-        };
-      } else {
-        console.log('No matching GHST transfer found for transaction:', tx.hash);
-        return null;
-      }
+    const depositDetails = batchDeposits.map(tx => ({
+      hash: tx.hash,
+      timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleDateString(),
+      value: ethers.formatEther(tx.value) // The total GHST value of the transaction
     }));
 
-    const validDepositDetails = depositDetails.filter(deposit => deposit !== null);
+    console.log('Final deposit details:', depositDetails);
 
-    console.log('Final deposit details:', validDepositDetails);
-
-    return validDepositDetails;
+    return depositDetails;
   } catch (error) {
     console.error('Error fetching rarity farming deposits:', error);
     return [];
@@ -271,7 +250,7 @@ function showDeposits(deposits, tokenId, name) {
     
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    ['Date', 'Amount (GHST)'].forEach(headerText => {
+    ['Date', 'Amount (GHST)', 'Transaction'].forEach(headerText => {
       const th = document.createElement('th');
       th.textContent = headerText;
       headerRow.appendChild(th);
@@ -282,17 +261,22 @@ function showDeposits(deposits, tokenId, name) {
     const tbody = document.createElement('tbody');
     deposits.forEach(deposit => {
       const row = document.createElement('tr');
+      
       const dateCell = document.createElement('td');
       dateCell.textContent = deposit.timestamp;
       row.appendChild(dateCell);
 
       const amountCell = document.createElement('td');
-      const amountLink = document.createElement('a');
-      amountLink.href = `https://polygonscan.com/tx/${deposit.hash}`;
-      amountLink.target = '_blank';
-      amountLink.textContent = deposit.value;
-      amountCell.appendChild(amountLink);
+      amountCell.textContent = parseFloat(deposit.value).toFixed(2);
       row.appendChild(amountCell);
+
+      const txCell = document.createElement('td');
+      const txLink = document.createElement('a');
+      txLink.href = `https://polygonscan.com/tx/${deposit.hash}`;
+      txLink.target = '_blank';
+      txLink.textContent = 'View Transaction';
+      txCell.appendChild(txLink);
+      row.appendChild(txCell);
 
       tbody.appendChild(row);
     });
@@ -300,6 +284,17 @@ function showDeposits(deposits, tokenId, name) {
     modalContent.appendChild(table);
   }
 
+  const closeButton = document.createElement('button');
+  closeButton.className = 'button centered-button';
+  closeButton.innerText = 'Close';
+  closeButton.addEventListener('click', () => {
+    document.body.removeChild(modalOverlay);
+  });
+  modalContent.appendChild(closeButton);
+
+  modalOverlay.appendChild(modalContent);
+  document.body.appendChild(modalOverlay);
+}
   const closeButton = document.createElement('button');
   closeButton.className = 'button centered-button';
   closeButton.innerText = 'Close';
