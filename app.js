@@ -141,7 +141,6 @@ const combinedABI = [
     type: 'function',
   },
 ];
-
 // Predefined ERC20 Tokens
 const predefinedTokens = [
   {
@@ -204,8 +203,8 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
 
     return deposits.map(tx => ({
       hash: tx.hash,
-      value: ethers.formatUnits(tx.value, 18),
-      timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleString()
+      value: parseFloat(ethers.formatUnits(tx.value, 18)).toFixed(2),
+      timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleDateString()
     }));
   } catch (error) {
     console.error('Error fetching rarity farming deposits:', error);
@@ -230,25 +229,39 @@ function showDeposits(deposits, tokenId, name) {
     noDepositsMessage.innerText = 'No deposits found in the past year.';
     modalContent.appendChild(noDepositsMessage);
   } else {
-    const depositList = document.createElement('ul');
-    depositList.className = 'deposit-list';
-    deposits.forEach(deposit => {
-      const listItem = document.createElement('li');
-      listItem.innerHTML = `<a href="https://polygonscan.com/tx/${deposit.hash}" target="_blank">${deposit.value} GHST on ${deposit.timestamp}</a>`;
-      depositList.appendChild(listItem);
+    const table = document.createElement('table');
+    table.className = 'deposit-table';
+    
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    ['Date', 'Amount (GHST)'].forEach(headerText => {
+      const th = document.createElement('th');
+      th.textContent = headerText;
+      headerRow.appendChild(th);
     });
-    modalContent.appendChild(depositList);
-  }
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
 
-  const showAllButton = document.createElement('button');
-  showAllButton.className = 'button';
-  showAllButton.innerText = 'Show All Deposits';
-  showAllButton.addEventListener('click', async () => {
-    modalContent.removeChild(showAllButton);
-    const allDeposits = await fetchAllRarityFarmingDeposits(escrowAddress);
-    showDeposits(allDeposits, tokenId, name);
-  });
-  modalContent.appendChild(showAllButton);
+    const tbody = document.createElement('tbody');
+    deposits.forEach(deposit => {
+      const row = document.createElement('tr');
+      const dateCell = document.createElement('td');
+      dateCell.textContent = deposit.timestamp;
+      row.appendChild(dateCell);
+
+      const amountCell = document.createElement('td');
+      const amountLink = document.createElement('a');
+      amountLink.href = `https://polygonscan.com/tx/${deposit.hash}`;
+      amountLink.target = '_blank';
+      amountLink.textContent = deposit.value;
+      amountCell.appendChild(amountLink);
+      row.appendChild(amountCell);
+
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    modalContent.appendChild(table);
+  }
 
   const closeButton = document.createElement('button');
   closeButton.className = 'button';
@@ -260,40 +273,6 @@ function showDeposits(deposits, tokenId, name) {
 
   modalOverlay.appendChild(modalContent);
   document.body.appendChild(modalOverlay);
-}
-
-// Function to fetch all rarity farming deposits
-async function fetchAllRarityFarmingDeposits(escrowAddress) {
-  const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7'; // GHST token on Polygon
-  const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
-
-  try {
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (data.status === '0' && data.message === 'No transactions found') {
-      console.log(`No transactions found for address: ${escrowAddress}`);
-      return [];
-    }
-
-    if (data.status !== '1') {
-      throw new Error(`API request failed: ${data.message}`);
-    }
-
-    const deposits = data.result.filter(tx => 
-      tx.to.toLowerCase() === escrowAddress.toLowerCase() && 
-      tx.contractAddress.toLowerCase() === GHST_CONTRACT.toLowerCase()
-    );
-
-    return deposits.map(tx => ({
-      hash: tx.hash,
-      value: ethers.formatUnits(tx.value, 18),
-      timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleString()
-    }));
-  } catch (error) {
-    console.error('Error fetching all rarity farming deposits:', error);
-    return [];
-  }
 }
 // Function to Fetch and Display Aavegotchis
 async function fetchAndDisplayAavegotchis(ownerAddress) {
@@ -402,12 +381,15 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       escrowLink.innerText = shortEscrowWallet;
       escrowCell.appendChild(escrowLink);
 
+      const buttonWrapper = document.createElement('span');
+      buttonWrapper.className = 'button-wrapper';
+
       const copyButton = document.createElement('button');
       copyButton.className = 'copy-button';
       copyButton.setAttribute('data-copy-target', escrowWallet);
       copyButton.setAttribute('data-tooltip', 'Copy Escrow Wallet Address');
       copyButton.innerText = '📄';
-      escrowCell.appendChild(copyButton);
+      buttonWrapper.appendChild(copyButton);
 
       const rarityFarmingButton = document.createElement('button');
       rarityFarmingButton.className = 'rarity-farming-button';
@@ -416,7 +398,9 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
       rarityFarmingButton.setAttribute('data-gotchi-name', name);
       rarityFarmingButton.setAttribute('data-tooltip', 'View Rarity Farming Deposits');
       rarityFarmingButton.innerText = '💰';
-      escrowCell.appendChild(rarityFarmingButton);
+      buttonWrapper.appendChild(rarityFarmingButton);
+
+      escrowCell.appendChild(buttonWrapper);
 
       rarityFarmingButton.addEventListener('click', async () => {
         const deposits = await fetchRarityFarmingDeposits(escrowWallet);
@@ -611,7 +595,6 @@ function cleanupEventListeners() {
 function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
-
 // Global Variables for Selected ERC20 Token
 let selectedERC20Address = ghstContractAddress; // Default to GHST
 let selectedERC20Symbol = 'GHST';
@@ -642,8 +625,7 @@ async function updateSelectedERC20Token(address) {
     showToast('Failed to fetch ERC20 token details. Ensure the address is correct and the token follows the ERC20 standard.', 'error');
   }
 }
-
-// Function to Generate Method Forms
+// Function to Generate Method Forms (continued)
 async function generateMethodForms() {
   methodFormsContainer.innerHTML = '';
   if (!contract) {
@@ -1040,8 +1022,7 @@ async function handleFormSubmit(event) {
         const name = gotchi.name && gotchi.name.trim() !== '' ? gotchi.name : '(No Name)';
         return { tokenId, balance, symbol, name };
       });
-
-      const balancesResult = await Promise.all(balancePromises);
+	        const balancesResult = await Promise.all(balancePromises);
       const filteredData = balancesResult.filter(({ balance }) => balance > 0n);
 
       if (filteredData.length === 0) {
@@ -1291,6 +1272,7 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
     });
   });
 }
+
 // Function to Toggle Collapse
 function toggleCollapse(contentElement, iconElement, expand) {
   if (expand) {
@@ -1444,7 +1426,6 @@ async function handleMaxButtonClick(form) {
     amountInput.value = formattedValue;
   }
 }
-
 // Function to Refresh Table Balances Based on Selected ERC20 Token
 async function refreshTableBalances() {
   try {
