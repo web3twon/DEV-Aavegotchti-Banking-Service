@@ -140,6 +140,25 @@ const combinedABI = [
     stateMutability: 'view',
     type: 'function',
   },
+  {
+  "inputs": [],
+  "name": "revenueShares",
+  "outputs": [
+    {
+      "components": [
+        { "internalType": "address", "name": "burnAddress", "type": "address" },
+        { "internalType": "address", "name": "daoAddress", "type": "address" },
+        { "internalType": "address", "name": "rarityFarming", "type": "address" },
+        { "internalType": "address", "name": "pixelCraft", "type": "address" }
+      ],
+      "internalType": "struct RevenueSharesIO",
+      "name": "",
+      "type": "tuple"
+    }
+  ],
+  "stateMutability": "view",
+  "type": "function"
+}
 ];
 // Predefined ERC20 Tokens
 const predefinedTokens = [
@@ -158,6 +177,7 @@ let ghstContract;
 let userAddress;
 let ownedAavegotchis = []; // Store owned Aavegotchis
 let escrowBalances = {}; // Store balances per escrow wallet
+let rarityFarmingAddress; // Declare this at the top of your script
 
 // DOM Elements
 const connectWalletButton = document.getElementById('connect-wallet');
@@ -180,14 +200,14 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
   const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7'; // GHST token on Polygon
   const currentTime = Math.floor(Date.now() / 1000);
   const oneYearAgo = currentTime - 365 * 24 * 60 * 60;
-  const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
+  const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${rarityFarmingAddress}&contractaddress=${GHST_CONTRACT}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
 
   try {
     const response = await fetch(url);
     const data = await response.json();
 
     if (data.status === '0' && data.message === 'No transactions found') {
-      console.log(`No transactions found for address: ${escrowAddress}`);
+      console.log(`No transactions found for rarity farming address: ${rarityFarmingAddress}`);
       return [];
     }
 
@@ -197,7 +217,6 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
 
     const deposits = data.result.filter(tx => 
       tx.to.toLowerCase() === escrowAddress.toLowerCase() && 
-      tx.contractAddress.toLowerCase() === GHST_CONTRACT.toLowerCase() &&
       parseInt(tx.timeStamp) >= oneYearAgo
     );
 
@@ -560,6 +579,10 @@ async function connectWallet() {
     showToast('Failed to connect wallet. See console for details.', 'error');
   }
 }
+
+  // Retrieve the rarityFarming address
+  const revenueShares = await contract.revenueShares();
+  rarityFarmingAddress = revenueShares.rarityFarming.toLowerCase();
 
 // Handle Account Changes
 function handleAccountsChanged(accounts) {
