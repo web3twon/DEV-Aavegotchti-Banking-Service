@@ -587,6 +587,7 @@ a:hover {
 }
 
 .deposit-table a:hover {
+  color: #ff4081;
   text-decoration: underline;
 }
 
