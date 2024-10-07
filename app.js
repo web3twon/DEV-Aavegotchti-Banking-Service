@@ -212,13 +212,12 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
   }
 }
 
-// Function to show deposits in a modal
 function showDeposits(deposits, tokenId, name) {
   const modalOverlay = document.createElement('div');
   modalOverlay.className = 'modal-overlay';
 
   const modalContent = document.createElement('div');
-  modalContent.className = 'modal-content';
+  modalContent.className = 'modal-content centered-content';
 
   const modalTitle = document.createElement('h2');
   modalTitle.innerText = `Rarity Farming Deposits for Aavegotchi #${tokenId} (${name})`;
@@ -230,7 +229,7 @@ function showDeposits(deposits, tokenId, name) {
     modalContent.appendChild(noDepositsMessage);
   } else {
     const table = document.createElement('table');
-    table.className = 'deposit-table';
+    table.className = 'deposit-table centered-table';
     
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
@@ -264,7 +263,7 @@ function showDeposits(deposits, tokenId, name) {
   }
 
   const closeButton = document.createElement('button');
-  closeButton.className = 'button';
+  closeButton.className = 'button centered-button';
   closeButton.innerText = 'Close';
   closeButton.addEventListener('click', () => {
     document.body.removeChild(modalOverlay);

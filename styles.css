@@ -495,7 +495,7 @@ a:hover {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(43, 43, 43, 0.75);
+  background-color: rgba(0, 0, 0, 0.5);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -503,13 +503,28 @@ a:hover {
 }
 
 .modal-content {
-  background: #7a4dad;
+  background-color: var(--color-soft-purple);
   padding: 20px;
   border-radius: var(--border-radius);
-  width: 90%;
-  max-width: 600px;
-  color: #000;
-  position: relative;
+  max-width: 80%;
+  max-height: 80%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.centered-content {
+  text-align: center;
+}
+
+.centered-table {
+  margin: 0 auto;
+  width: 100%;
+  max-width: 500px;
+}
+
+.centered-button {
+  margin-top: 20px;
 }
 
 .modal-content h2 {
@@ -548,6 +563,31 @@ a:hover {
   padding: 10px 20px;
   font-size: 16px;
   cursor: pointer;
+}
+.deposit-table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.deposit-table th,
+.deposit-table td {
+  border: 1px solid var(--color-border-gray);
+  padding: 8px;
+  text-align: left;
+}
+
+.deposit-table th {
+  background-color: var(--color-dark-purple);
+  color: var(--color-white);
+}
+
+.deposit-table a {
+  color: var(--color-bright-blue);
+  text-decoration: none;
+}
+
+.deposit-table a:hover {
+  text-decoration: underline;
 }
 
 /* Modal Form Styles */
