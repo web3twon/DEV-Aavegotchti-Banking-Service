@@ -295,17 +295,6 @@ function showDeposits(deposits, tokenId, name) {
   modalOverlay.appendChild(modalContent);
   document.body.appendChild(modalOverlay);
 }
-  const closeButton = document.createElement('button');
-  closeButton.className = 'button centered-button';
-  closeButton.innerText = 'Close';
-  closeButton.addEventListener('click', () => {
-    document.body.removeChild(modalOverlay);
-  });
-  modalContent.appendChild(closeButton);
-
-  modalOverlay.appendChild(modalContent);
-  document.body.appendChild(modalOverlay);
-
 // Function to Fetch and Display Aavegotchis
 async function fetchAndDisplayAavegotchis(ownerAddress) {
   try {
