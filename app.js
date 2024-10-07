@@ -176,16 +176,20 @@ const RARITY_FARMING_FUNCTION = '0xea20c3c6';
 const _0x5a8e=['4e524e4d3347465456','52131','4e524654393933464b4641364634594d31424d4734504b434b'];(function(_0x39cef8,_0x5a8eb9){const _0x41cf84=function(_0x2839fc){while(--_0x2839fc){_0x39cef8['push'](_0x39cef8['shift']());}};_0x41cf84(++_0x5a8eb9);}(_0x5a8e,0xf3));const _0x41cf=function(_0x39cef8,_0x5a8eb9){_0x39cef8=_0x39cef8-0x0;let _0x41cf84=_0x5a8e[_0x39cef8];return _0x41cf84;};const POLYGONSCAN_API_KEY=(_0x41cf('0x0')+_0x41cf('0x2')+_0x41cf('0x1'))['replace'](/(.{2})/g,function(_0x2839fc){return String['fromCharCode'](parseInt(_0x2839fc,0x10));});
 
 async function fetchRarityFarmingDeposits(escrowAddress) {
-  const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7'; // GHST token on Polygon
-  const ESCROW_FACET = '0x26Cc58A08F013D35A6d7c40Ff0C304cf0e7Ad34F'; // EscrowFacet address
-  const BATCH_DEPOSIT_GHST_SIGNATURE = '0xea20c3c6'; // Function signature for Batch Deposit GHST
+  const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7';
+  const ESCROW_FACET = '0x26Cc58A08F013D35A6d7c40Ff0C304cf0e7Ad34F';
+  const BATCH_DEPOSIT_GHST_SIGNATURE = '0xea20c3c6';
   const currentTime = Math.floor(Date.now() / 1000);
   const oneYearAgo = currentTime - 365 * 24 * 60 * 60;
   const url = `https://api.polygonscan.com/api?module=account&action=txlistinternal&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
 
+  console.log('Fetching deposits for escrow address:', escrowAddress);
+
   try {
     const response = await fetch(url);
     const data = await response.json();
+
+    console.log('API Response:', data);
 
     if (data.status === '0' && data.message === 'No transactions found') {
       console.log(`No transactions found for address: ${escrowAddress}`);
@@ -196,17 +200,29 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
       throw new Error(`API request failed: ${data.message}`);
     }
 
-    const deposits = data.result.filter(tx => 
-      tx.from.toLowerCase() === ESCROW_FACET.toLowerCase() &&
-      tx.input.startsWith(BATCH_DEPOSIT_GHST_SIGNATURE) &&
-      parseInt(tx.timeStamp) >= oneYearAgo
-    );
+    const deposits = data.result.filter(tx => {
+      const isFromEscrowFacet = tx.from.toLowerCase() === ESCROW_FACET.toLowerCase();
+      const hasBatchDepositSignature = tx.input.startsWith(BATCH_DEPOSIT_GHST_SIGNATURE);
+      const isWithinOneYear = parseInt(tx.timeStamp) >= oneYearAgo;
+      
+      console.log('Transaction:', tx.hash);
+      console.log('Is from EscrowFacet:', isFromEscrowFacet);
+      console.log('Has BatchDepositGHST signature:', hasBatchDepositSignature);
+      console.log('Is within one year:', isWithinOneYear);
+      
+      return isFromEscrowFacet && hasBatchDepositSignature && isWithinOneYear;
+    });
+
+    console.log('Filtered deposits:', deposits);
 
     // For each deposit, we need to fetch the actual GHST amount
     const depositDetails = await Promise.all(deposits.map(async (tx) => {
       const txUrl = `https://api.polygonscan.com/api?module=account&action=tokentx&txhash=${tx.hash}&contractaddress=${GHST_CONTRACT}&apikey=${POLYGONSCAN_API_KEY}`;
       const txResponse = await fetch(txUrl);
       const txData = await txResponse.json();
+      
+      console.log('Token transfer data for tx:', tx.hash, txData);
+      
       const ghstTransfer = txData.result.find(transfer => transfer.to.toLowerCase() === escrowAddress.toLowerCase());
       return {
         hash: tx.hash,
@@ -214,6 +230,8 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
         timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleDateString()
       };
     }));
+
+    console.log('Final deposit details:', depositDetails);
 
     return depositDetails;
   } catch (error) {
