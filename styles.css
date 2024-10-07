@@ -170,8 +170,7 @@ header p {
   text-decoration: underline;
 }
 
-.aavegotchi-table td .copy-button,
-.aavegotchi-table td .rarity-farming-button {
+.aavegotchi-table td .copy-button {
   margin-left: 5px;
 }
 
@@ -265,7 +264,7 @@ a:hover {
   margin-left: 5px;
   font-size: 16px;
   transition: color var(--transition-speed);
-  padding: 5px;
+  padding: 10px;
   position: relative;
 }
 
@@ -299,7 +298,7 @@ a:hover {
   visibility: visible;
 }
 
-/* Rarity Farming Button Styles */
+/* New Styles for Rarity Farming Emoji */
 .rarity-farming-button {
   background: none;
   border: none;
@@ -308,7 +307,7 @@ a:hover {
   margin-left: 5px;
   font-size: 16px;
   transition: color var(--transition-speed);
-  padding: 5px;
+  padding: 10px;
   position: relative;
 }
 
@@ -840,34 +839,30 @@ a:hover {
   margin-bottom: 5px;
 }
 
-.deposit-table {
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 100%;
-  border-collapse: collapse;
-  margin-top: 15px;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
 }
 
-.deposit-table th,
-.deposit-table td {
-  padding: 10px;
-  text-align: left;
-  border-bottom: 1px solid #4a5568;
-  font-size: 16px;
-  word-break: break-word;
+.modal-content {
+  background-color: var(--color-soft-purple);
+  padding: 20px;
+  border-radius: var(--border-radius);
+  max-width: 80%;
+  max-height: 80%;
+  overflow-y: auto;
 }
 
-.deposit-table th {
-  background-color: #7a4dad;
-  color: #ffc0cb;
-}
-
-.deposit-table td a {
-  color: #ff4081;
-  text-decoration: none;
-}
-
-.deposit-table td a:hover {
-  color: #f50057;
-  text-decoration: underline;
+.modal-content h2 {
+  margin-top: 0;
 }
 
 .modal-content .button {
