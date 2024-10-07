@@ -171,7 +171,7 @@ header p {
 }
 
 .aavegotchi-table td .copy-button {
-  margin-left: 5px;
+  margin-left: 2px;
 }
 
 /* New Styles for Owned/Rented Status */
@@ -264,7 +264,7 @@ a:hover {
   margin-left: 5px;
   font-size: 20px;
   transition: color var(--transition-speed);
-  padding: 10px;
+  padding: 5px;
   position: relative;
 }
 
@@ -307,7 +307,7 @@ a:hover {
   margin-left: 0px;
   font-size: 20px;
   transition: color var(--transition-speed);
-  padding: 10px;
+  padding: 5px;
   position: relative;
 }
 
