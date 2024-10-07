@@ -181,13 +181,13 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
   const currentTime = Math.floor(Date.now() / 1000);
   const oneYearAgo = currentTime - 365 * 24 * 60 * 60;
   
-  // First, fetch normal transactions to the escrow address
-  const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&contractaddress=${GHST_CONTRACT}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
+  // Fetch internal transactions to identify batch deposits
+  const internalTxUrl = `https://api.polygonscan.com/api?module=account&action=txlistinternal&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
 
-  console.log('Fetching deposits for escrow address:', escrowAddress);
+  console.log('Fetching internal transactions for escrow address:', escrowAddress);
 
   try {
-    const response = await fetch(url);
+    const response = await fetch(internalTxUrl);
     const data = await response.json();
 
     console.log('API Response:', data);
@@ -201,44 +201,49 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
       throw new Error(`API request failed: ${data.message}`);
     }
 
-    const deposits = data.result.filter(tx => {
-      const isIncomingGHST = tx.to.toLowerCase() === escrowAddress.toLowerCase();
+    const batchDeposits = data.result.filter(tx => {
+      const isBatchDeposit = tx.input && tx.input.startsWith(BATCH_DEPOSIT_GHST_SIGNATURE);
       const isWithinOneYear = parseInt(tx.timeStamp) >= oneYearAgo;
       
       console.log('Transaction:', tx.hash);
-      console.log('Is incoming GHST:', isIncomingGHST);
+      console.log('Is batch deposit:', isBatchDeposit);
       console.log('Is within one year:', isWithinOneYear);
       
-      return isIncomingGHST && isWithinOneYear;
+      return isBatchDeposit && isWithinOneYear;
     });
 
-    console.log('Filtered deposits:', deposits);
+    console.log('Filtered batch deposits:', batchDeposits);
 
-    // For each deposit, we'll check if it's part of a batchDepositGHST transaction
-    const depositDetails = await Promise.all(deposits.map(async (tx) => {
-      const txUrl = `https://api.polygonscan.com/api?module=proxy&action=eth_getTransactionByHash&txhash=${tx.hash}&apikey=${POLYGONSCAN_API_KEY}`;
-      const txResponse = await fetch(txUrl);
-      const txData = await txResponse.json();
+    // Fetch token transfer details for batch deposits
+    const depositDetails = await Promise.all(batchDeposits.map(async (tx) => {
+      const tokenTxUrl = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&contractaddress=${GHST_CONTRACT}&startblock=${tx.blockNumber}&endblock=${tx.blockNumber}&sort=asc&apikey=${POLYGONSCAN_API_KEY}`;
+      const tokenTxResponse = await fetch(tokenTxUrl);
+      const tokenTxData = await tokenTxResponse.json();
       
-      console.log('Transaction data for tx:', tx.hash, txData);
+      console.log('Token transfer data for tx:', tx.hash, tokenTxData);
       
-      const isBatchDeposit = txData.result && txData.result.input && txData.result.input.startsWith(BATCH_DEPOSIT_GHST_SIGNATURE);
-      
-      return {
-        hash: tx.hash,
-        value: parseFloat(ethers.formatUnits(tx.value, 18)).toFixed(2),
-        timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleDateString(),
-        isBatchDeposit: isBatchDeposit
-      };
+      const ghstTransfer = tokenTxData.result.find(transfer => 
+        transfer.to.toLowerCase() === escrowAddress.toLowerCase() &&
+        transfer.hash.toLowerCase() === tx.hash.toLowerCase()
+      );
+
+      if (ghstTransfer) {
+        return {
+          hash: tx.hash,
+          value: parseFloat(ethers.formatUnits(ghstTransfer.value, 18)).toFixed(2),
+          timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleDateString()
+        };
+      } else {
+        console.log('No matching GHST transfer found for transaction:', tx.hash);
+        return null;
+      }
     }));
 
-    console.log('Final deposit details:', depositDetails);
+    const validDepositDetails = depositDetails.filter(deposit => deposit !== null);
 
-    // Optionally, you can filter to only show batch deposits
-    // const batchDepositDetails = depositDetails.filter(d => d.isBatchDeposit);
-    // return batchDepositDetails;
+    console.log('Final deposit details:', validDepositDetails);
 
-    return depositDetails;
+    return validDepositDetails;
   } catch (error) {
     console.error('Error fetching rarity farming deposits:', error);
     return [];
