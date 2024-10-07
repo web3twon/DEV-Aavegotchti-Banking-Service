@@ -178,10 +178,7 @@ const _0x5a8e=['4e524e4d3347465456','52131','4e524654393933464b4641364634594d314
 // Function to fetch rarity farming deposits
 async function fetchRarityFarmingDeposits(escrowAddress) {
   const BATCH_DEPOSIT_GHST_SIGNATURE = '0xea20c3c6';
-  const currentTime = Math.floor(Date.now() / 1000);
-  const oneYearAgo = currentTime - 365 * 24 * 60 * 60;
   
-  // Fetch normal transactions
   const txUrl = `https://api.polygonscan.com/api?module=account&action=txlist&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
 
   console.log('Fetching transactions for escrow address:', escrowAddress);
@@ -201,30 +198,29 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
       throw new Error(`API request failed: ${data.message}`);
     }
 
-    const batchDeposits = data.result.filter(tx => {
+    const deposits = data.result.map(tx => {
       const isBatchDeposit = tx.input.startsWith(BATCH_DEPOSIT_GHST_SIGNATURE);
-      const isWithinOneYear = parseInt(tx.timeStamp) >= oneYearAgo;
+      const timestamp = new Date(parseInt(tx.timeStamp) * 1000);
       
       console.log('Transaction:', tx.hash);
+      console.log('Input data:', tx.input);
       console.log('Is batch deposit:', isBatchDeposit);
-      console.log('Is within one year:', isWithinOneYear);
+      console.log('Timestamp:', timestamp.toLocaleString());
+      console.log('Value:', ethers.formatEther(tx.value), 'GHST');
       
-      return isBatchDeposit && isWithinOneYear;
+      return {
+        hash: tx.hash,
+        timestamp: timestamp.toLocaleDateString(),
+        value: ethers.formatEther(tx.value),
+        isBatchDeposit: isBatchDeposit
+      };
     });
 
-    console.log('Filtered batch deposits:', batchDeposits);
+    console.log('All deposits:', deposits);
 
-    const depositDetails = batchDeposits.map(tx => ({
-      hash: tx.hash,
-      timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleDateString(),
-      value: ethers.formatEther(tx.value) // The total GHST value of the transaction
-    }));
-
-    console.log('Final deposit details:', depositDetails);
-
-    return depositDetails;
+    return deposits;
   } catch (error) {
-    console.error('Error fetching rarity farming deposits:', error);
+    console.error('Error fetching deposits:', error);
     return [];
   }
 }
@@ -237,12 +233,12 @@ function showDeposits(deposits, tokenId, name) {
   modalContent.className = 'modal-content centered-content';
 
   const modalTitle = document.createElement('h2');
-  modalTitle.innerText = `Rarity Farming Deposits for Aavegotchi #${tokenId} (${name})`;
+  modalTitle.innerText = `Deposits for Aavegotchi #${tokenId} (${name})`;
   modalContent.appendChild(modalTitle);
 
   if (deposits.length === 0) {
     const noDepositsMessage = document.createElement('p');
-    noDepositsMessage.innerText = 'No deposits found in the past year.';
+    noDepositsMessage.innerText = 'No deposits found.';
     modalContent.appendChild(noDepositsMessage);
   } else {
     const table = document.createElement('table');
@@ -250,7 +246,7 @@ function showDeposits(deposits, tokenId, name) {
     
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    ['Date', 'Amount (GHST)', 'Transaction'].forEach(headerText => {
+    ['Date', 'Amount (GHST)', 'Type', 'Transaction'].forEach(headerText => {
       const th = document.createElement('th');
       th.textContent = headerText;
       headerRow.appendChild(th);
@@ -269,6 +265,11 @@ function showDeposits(deposits, tokenId, name) {
       const amountCell = document.createElement('td');
       amountCell.textContent = parseFloat(deposit.value).toFixed(2);
       row.appendChild(amountCell);
+
+      const typeCell = document.createElement('td');
+      typeCell.textContent = deposit.isBatchDeposit ? 'Batch' : 'Single';
+      typeCell.style.color = deposit.isBatchDeposit ? 'green' : 'orange';
+      row.appendChild(typeCell);
 
       const txCell = document.createElement('td');
       const txLink = document.createElement('a');
