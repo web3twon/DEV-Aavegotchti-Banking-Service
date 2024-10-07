@@ -580,9 +580,21 @@ async function connectWallet() {
   }
 }
 
-  // Retrieve the rarityFarming address
-  const revenueShares = await contract.revenueShares();
-  rarityFarmingAddress = revenueShares.rarityFarming.toLowerCase();
+async function getRevenueFarmingAddress() {
+  try {
+    // Retrieve the rarityFarming address
+    const revenueShares = await contract.revenueShares();
+    rarityFarmingAddress = revenueShares.rarityFarming.toLowerCase();
+    // Handle the result or perform further operations
+    console.log('Rarity Farming Address:', rarityFarmingAddress);
+  } catch (error) {
+    // Handle the error
+    console.error('Error retrieving revenue shares:', error);
+  }
+}
+
+// Call the async function
+getRevenueFarmingAddress();
 
 // Handle Account Changes
 function handleAccountsChanged(accounts) {
