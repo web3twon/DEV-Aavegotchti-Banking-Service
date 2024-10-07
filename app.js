@@ -175,22 +175,16 @@ const RARITY_FARMING_FUNCTION = '0xea20c3c6';
 // Obfuscated API Key (this is a basic obfuscation, not secure for client-side use)
 const _0x5a8e=['4e524e4d3347465456','52131','4e524654393933464b4641364634594d31424d4734504b434b'];(function(_0x39cef8,_0x5a8eb9){const _0x41cf84=function(_0x2839fc){while(--_0x2839fc){_0x39cef8['push'](_0x39cef8['shift']());}};_0x41cf84(++_0x5a8eb9);}(_0x5a8e,0xf3));const _0x41cf=function(_0x39cef8,_0x5a8eb9){_0x39cef8=_0x39cef8-0x0;let _0x41cf84=_0x5a8e[_0x39cef8];return _0x41cf84;};const POLYGONSCAN_API_KEY=(_0x41cf('0x0')+_0x41cf('0x2')+_0x41cf('0x1'))['replace'](/(.{2})/g,function(_0x2839fc){return String['fromCharCode'](parseInt(_0x2839fc,0x10));});
 
+// Function to fetch rarity farming deposits
 async function fetchRarityFarmingDeposits(escrowAddress) {
-  const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7';
-  const BATCH_DEPOSIT_GHST_SIGNATURE = '0xea20c3c6';
+  const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7'; // GHST token on Polygon
   const currentTime = Math.floor(Date.now() / 1000);
   const oneYearAgo = currentTime - 365 * 24 * 60 * 60;
-  
-  // Fetch internal transactions to identify batch deposits
-  const internalTxUrl = `https://api.polygonscan.com/api?module=account&action=txlistinternal&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
-
-  console.log('Fetching internal transactions for escrow address:', escrowAddress);
+  const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
 
   try {
-    const response = await fetch(internalTxUrl);
+    const response = await fetch(url);
     const data = await response.json();
-
-    console.log('API Response:', data);
 
     if (data.status === '0' && data.message === 'No transactions found') {
       console.log(`No transactions found for address: ${escrowAddress}`);
@@ -201,49 +195,17 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
       throw new Error(`API request failed: ${data.message}`);
     }
 
-    const batchDeposits = data.result.filter(tx => {
-      const isBatchDeposit = tx.input && tx.input.startsWith(BATCH_DEPOSIT_GHST_SIGNATURE);
-      const isWithinOneYear = parseInt(tx.timeStamp) >= oneYearAgo;
-      
-      console.log('Transaction:', tx.hash);
-      console.log('Is batch deposit:', isBatchDeposit);
-      console.log('Is within one year:', isWithinOneYear);
-      
-      return isBatchDeposit && isWithinOneYear;
-    });
+    const deposits = data.result.filter(tx => 
+      tx.to.toLowerCase() === escrowAddress.toLowerCase() && 
+      tx.contractAddress.toLowerCase() === GHST_CONTRACT.toLowerCase() &&
+      parseInt(tx.timeStamp) >= oneYearAgo
+    );
 
-    console.log('Filtered batch deposits:', batchDeposits);
-
-    // Fetch token transfer details for batch deposits
-    const depositDetails = await Promise.all(batchDeposits.map(async (tx) => {
-      const tokenTxUrl = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&contractaddress=${GHST_CONTRACT}&startblock=${tx.blockNumber}&endblock=${tx.blockNumber}&sort=asc&apikey=${POLYGONSCAN_API_KEY}`;
-      const tokenTxResponse = await fetch(tokenTxUrl);
-      const tokenTxData = await tokenTxResponse.json();
-      
-      console.log('Token transfer data for tx:', tx.hash, tokenTxData);
-      
-      const ghstTransfer = tokenTxData.result.find(transfer => 
-        transfer.to.toLowerCase() === escrowAddress.toLowerCase() &&
-        transfer.hash.toLowerCase() === tx.hash.toLowerCase()
-      );
-
-      if (ghstTransfer) {
-        return {
-          hash: tx.hash,
-          value: parseFloat(ethers.formatUnits(ghstTransfer.value, 18)).toFixed(2),
-          timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleDateString()
-        };
-      } else {
-        console.log('No matching GHST transfer found for transaction:', tx.hash);
-        return null;
-      }
+    return deposits.map(tx => ({
+      hash: tx.hash,
+      value: parseFloat(ethers.formatUnits(tx.value, 18)).toFixed(2),
+      timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleDateString()
     }));
-
-    const validDepositDetails = depositDetails.filter(deposit => deposit !== null);
-
-    console.log('Final deposit details:', validDepositDetails);
-
-    return validDepositDetails;
   } catch (error) {
     console.error('Error fetching rarity farming deposits:', error);
     return [];
