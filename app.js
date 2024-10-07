@@ -305,7 +305,7 @@ function showDeposits(deposits, tokenId, name) {
 
   modalOverlay.appendChild(modalContent);
   document.body.appendChild(modalOverlay);
-}
+
 // Function to Fetch and Display Aavegotchis
 async function fetchAndDisplayAavegotchis(ownerAddress) {
   try {
