@@ -250,7 +250,7 @@ function showDeposits(deposits, tokenId, name) {
     
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    ['Date', 'Amount (GHST)', 'Transaction'].forEach(headerText => {
+    ['Date', 'Amount (GHST)'].forEach(headerText => {
       const th = document.createElement('th');
       th.textContent = headerText;
       headerRow.appendChild(th);
@@ -261,22 +261,17 @@ function showDeposits(deposits, tokenId, name) {
     const tbody = document.createElement('tbody');
     deposits.forEach(deposit => {
       const row = document.createElement('tr');
-      
       const dateCell = document.createElement('td');
       dateCell.textContent = deposit.timestamp;
       row.appendChild(dateCell);
 
       const amountCell = document.createElement('td');
-      amountCell.textContent = parseFloat(deposit.value).toFixed(2);
+      const amountLink = document.createElement('a');
+      amountLink.href = `https://polygonscan.com/tx/${deposit.hash}`;
+      amountLink.target = '_blank';
+      amountLink.textContent = deposit.value;
+      amountCell.appendChild(amountLink);
       row.appendChild(amountCell);
-
-      const txCell = document.createElement('td');
-      const txLink = document.createElement('a');
-      txLink.href = `https://polygonscan.com/tx/${deposit.hash}`;
-      txLink.target = '_blank';
-      txLink.textContent = 'View Transaction';
-      txCell.appendChild(txLink);
-      row.appendChild(txCell);
 
       tbody.appendChild(row);
     });
@@ -284,17 +279,6 @@ function showDeposits(deposits, tokenId, name) {
     modalContent.appendChild(table);
   }
 
-  const closeButton = document.createElement('button');
-  closeButton.className = 'button centered-button';
-  closeButton.innerText = 'Close';
-  closeButton.addEventListener('click', () => {
-    document.body.removeChild(modalOverlay);
-  });
-  modalContent.appendChild(closeButton);
-
-  modalOverlay.appendChild(modalContent);
-  document.body.appendChild(modalOverlay);
-}
   const closeButton = document.createElement('button');
   closeButton.className = 'button centered-button';
   closeButton.innerText = 'Close';
