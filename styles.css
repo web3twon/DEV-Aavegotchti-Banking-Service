@@ -855,18 +855,18 @@ a:hover {
   to { opacity: 0; transform: translateY(-20px); }
 }
 
-/* Token Image Styles */
-.token-balance {
-  display: flex;
-  align-items: center;
-}
-
 .token-balance img {
   width: 24px;
   height: 24px;
   margin-right: 8px;
   vertical-align: middle;
   border-radius: 50%;
+}
+
+/* Token Image Styles */
+.token-balance {
+  display: flex;
+  align-items: center;
 }
 
 /* Styles for Rarity Farming Deposits */
