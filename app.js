@@ -141,7 +141,6 @@ const combinedABI = [
     type: 'function',
   },
 ];
-
 // Predefined ERC20 Tokens
 const predefinedTokens = [
   {
@@ -174,102 +173,39 @@ connectWalletButton.addEventListener('click', connectWallet);
 // Constants for Rarity Farming
 const RARITY_FARMING_FUNCTION = '0xea20c3c6';
 // Obfuscated API Key (this is a basic obfuscation, not secure for client-side use)
-const _0x5a8e = ['4e524e4d3347465456', '52131', '4e524654393933464b4641364634594d31424d4734504b434b'];
-(function(_0x39cef8, _0x5a8eb9) {
-  const _0x41cf84 = function(_0x2839fc) {
-    while (--_0x2839fc) {
-      _0x39cef8.push(_0x39cef8.shift());
-    }
-  };
-  _0x41cf84(++_0x5a8eb9);
-}(_0x5a8e, 0xf3));
-const _0x41cf = function(_0x39cef8, _0x5a8eb9) {
-  _0x39cef8 = _0x39cef8 - 0x0;
-  let _0x41cf84 = _0x5a8e[_0x39cef8];
-  return _0x41cf84;
-};
-const POLYGONSCAN_API_KEY = (_0x41cf('0x0') + _0x41cf('0x2') + _0x41cf('0x1'))['replace'](/(.{2})/g, function(_0x2839fc) {
-  return String['fromCharCode'](parseInt(_0x2839fc, 0x10));
-});
+const _0x5a8e=['4e524e4d3347465456','52131','4e524654393933464b4641364634594d31424d4734504b434b'];(function(_0x39cef8,_0x5a8eb9){const _0x41cf84=function(_0x2839fc){while(--_0x2839fc){_0x39cef8['push'](_0x39cef8['shift']());}};_0x41cf84(++_0x5a8eb9);}(_0x5a8e,0xf3));const _0x41cf=function(_0x39cef8,_0x5a8eb9){_0x39cef8=_0x39cef8-0x0;let _0x41cf84=_0x5a8e[_0x39cef8];return _0x41cf84;};const POLYGONSCAN_API_KEY=(_0x41cf('0x0')+_0x41cf('0x2')+_0x41cf('0x1'))['replace'](/(.{2})/g,function(_0x2839fc){return String['fromCharCode'](parseInt(_0x2839fc,0x10));});
 
-// Aavegotchi DAO/Project Payout Addresses (both old and new)
-const AAVEGOTCHI_PAYOUT_ADDRESSES = [
-  '0x821049b2273b0cCd34a64D1B08A3346F110eCAe2', // New Payout Address
-  '0xb6384935d68e9858f8385ebeed7db84fc93b1420', // Old Payout Address
-];
+// Aavegotchi DAO/Project Payout Address
+const AAVEGOTCHI_PAYOUT_ADDRESS = '0x821049b2273b0cCd34a64D1B08A3346F110eCAe2';
 
-
-// Memoized getTokenImageUrl function
-const memoizedGetTokenImageUrl = (() => {
-  const cache = new Map();
-  return async (tokenAddress) => {
-    if (cache.has(tokenAddress)) {
-      return cache.get(tokenAddress);
-    }
-    try {
-      const response = await fetch(`https://api.coingecko.com/api/v3/coins/polygon-pos/contract/${tokenAddress}`);
-      if (!response.ok) throw new Error('Failed to fetch token data');
-      const data = await response.json();
-      const imageUrl = data.image.small;
-      cache.set(tokenAddress, imageUrl);
-      return imageUrl;
-    } catch (error) {
-      console.error('Error fetching token image:', error);
-      return 'path/to/default/token/image.png'; // Use a default image path
-    }
-  };
-})();
-
-// Function to fetch rarity farming deposits from two years ago with multiple payout addresses
+// Function to fetch rarity farming deposits
 async function fetchRarityFarmingDeposits(escrowAddress) {
   const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7'; // GHST token on Polygon
   const currentTime = Math.floor(Date.now() / 1000);
-  const twoYearsAgo = currentTime - 2 * 365 * 24 * 60 * 60; // Subtracting two years in seconds
-  const pageSize = 1000; // Number of transactions per page
-  let page = 1;
-  let hasMore = true;
-  let allDeposits = [];
+  const oneYearAgo = currentTime - 365 * 24 * 60 * 60;
+  const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
 
   try {
-    while (hasMore) {
-      const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&page=${page}&offset=${pageSize}&apikey=${POLYGONSCAN_API_KEY}`;
-      const response = await fetch(url);
-      const data = await response.json();
+    const response = await fetch(url);
+    const data = await response.json();
 
-      if (data.status === '0' && data.message === 'No transactions found') {
-        console.log(`No transactions found for address: ${escrowAddress}`);
-        break;
-      }
-
-      if (data.status !== '1') {
-        throw new Error(`API request failed: ${data.message}`);
-      }
-
-      // Convert payout addresses to lowercase for comparison
-      const lowercasedPayoutAddresses = AAVEGOTCHI_PAYOUT_ADDRESSES.map(addr => addr.toLowerCase());
-
-      // Filter transactions based on multiple payout addresses
-      const filteredDeposits = data.result.filter(tx =>
-        tx.to.toLowerCase() === escrowAddress.toLowerCase() &&
-        lowercasedPayoutAddresses.includes(tx.from.toLowerCase()) &&
-        tx.contractAddress.toLowerCase() === GHST_CONTRACT.toLowerCase() &&
-        parseInt(tx.timeStamp) >= twoYearsAgo
-      );
-
-      allDeposits.push(...filteredDeposits);
-
-      // Check if the last transaction fetched is older than two years
-      const lastTxTime = parseInt(data.result[data.result.length - 1].timeStamp);
-      if (data.result.length < pageSize || lastTxTime < twoYearsAgo) {
-        hasMore = false;
-      } else {
-        page += 1;
-        // Optional: Delay between requests to respect rate limits
-        await delay(200); // 200ms delay
-      }
+    if (data.status === '0' && data.message === 'No transactions found') {
+      console.log(`No transactions found for address: ${escrowAddress}`);
+      return [];
     }
 
-    return allDeposits.map(tx => ({
+    if (data.status !== '1') {
+      throw new Error(`API request failed: ${data.message}`);
+    }
+
+    const deposits = data.result.filter(tx => 
+      tx.to.toLowerCase() === escrowAddress.toLowerCase() &&
+      tx.from.toLowerCase() === AAVEGOTCHI_PAYOUT_ADDRESS.toLowerCase() &&
+      tx.contractAddress.toLowerCase() === GHST_CONTRACT.toLowerCase() &&
+      parseInt(tx.timeStamp) >= oneYearAgo
+    );
+
+    return deposits.map(tx => ({
       hash: tx.hash,
       value: parseFloat(ethers.formatUnits(tx.value, 18)).toFixed(2),
       timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleDateString()
@@ -280,13 +216,6 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
   }
 }
 
-// Helper function to introduce delays
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-
-// Optimized showDeposits function using DocumentFragment and innerHTML
 function showDeposits(deposits, tokenId, name) {
   const modalOverlay = document.createElement('div');
   modalOverlay.className = 'modal-overlay';
@@ -294,41 +223,57 @@ function showDeposits(deposits, tokenId, name) {
   const modalContent = document.createElement('div');
   modalContent.className = 'modal-content centered-content';
 
-  const fragment = document.createDocumentFragment();
-  fragment.appendChild(document.createElement('h2')).innerText = `Rarity Farming Deposits for Aavegotchi #${tokenId} (${name})`;
+  const modalTitle = document.createElement('h2');
+  modalTitle.innerText = `Rarity Farming Deposits for Aavegotchi #${tokenId} (${name})`;
+  modalContent.appendChild(modalTitle);
 
   if (deposits.length === 0) {
-    fragment.appendChild(document.createElement('p')).innerText = 'No rarity farming deposits found in the past year.';
+    const noDepositsMessage = document.createElement('p');
+    noDepositsMessage.innerText = 'No rarity farming deposits found in the past year.';
+    modalContent.appendChild(noDepositsMessage);
   } else {
     const table = document.createElement('table');
     table.className = 'deposit-table centered-table';
-
-    table.innerHTML = `
-      <thead>
-        <tr>
-          <th>Date</th>
-          <th>Amount (GHST)</th>
-          <th>Transaction Hash</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${deposits.map(deposit => `
-          <tr>
-            <td>${deposit.timestamp}</td>
-            <td>${deposit.value}</td>
-            <td><a href="https://polygonscan.com/tx/${deposit.hash}" target="_blank" rel="noopener noreferrer">${deposit.hash.slice(0, 6)}...${deposit.hash.slice(-4)}</a></td>
-          </tr>
-        `).join('')}
-      </tbody>
-    `;
     
-    fragment.appendChild(table);
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    ['Date', 'Amount (GHST)', 'Transaction Hash'].forEach(headerText => {
+      const th = document.createElement('th');
+      th.textContent = headerText;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    deposits.forEach(deposit => {
+      const row = document.createElement('tr');
+      const dateCell = document.createElement('td');
+      dateCell.textContent = deposit.timestamp;
+      row.appendChild(dateCell);
+
+      const amountCell = document.createElement('td');
+      amountCell.textContent = deposit.value;
+      row.appendChild(amountCell);
+
+      const hashCell = document.createElement('td');
+      const hashLink = document.createElement('a');
+      hashLink.href = `https://polygonscan.com/tx/${deposit.hash}`;
+      hashLink.target = '_blank';
+      hashLink.textContent = `${deposit.hash.slice(0, 6)}...${deposit.hash.slice(-4)}`;
+      hashCell.appendChild(hashLink);
+row.appendChild(hashCell);
+
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    modalContent.appendChild(table);
 
     const totalDeposits = deposits.reduce((total, deposit) => total + parseFloat(deposit.value), 0);
     const totalElement = document.createElement('p');
     totalElement.className = 'total-deposits';
     totalElement.innerText = `Total Rarity Farming Deposits: ${totalDeposits.toFixed(2)} GHST`;
-    fragment.appendChild(totalElement);
+    modalContent.appendChild(totalElement);
   }
 
   const closeButton = document.createElement('button');
@@ -337,9 +282,8 @@ function showDeposits(deposits, tokenId, name) {
   closeButton.addEventListener('click', () => {
     document.body.removeChild(modalOverlay);
   });
-  fragment.appendChild(closeButton);
+  modalContent.appendChild(closeButton);
 
-  modalContent.appendChild(fragment);
   modalOverlay.appendChild(modalContent);
   document.body.appendChild(modalOverlay);
 }
@@ -362,24 +306,27 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     const table = document.createElement('table');
     table.className = 'aavegotchi-table';
 
-    table.innerHTML = `
-      <thead>
-        <tr>
-          <th>Token ID</th>
-          <th>Name</th>
-          <th>Escrow Wallet</th>
-          <th>${tokenSymbol} Balance</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-      </tbody>
-    `;
-    
-    const tbody = table.querySelector('tbody');
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
 
-    const balancePromises = aavegotchis.map(aavegotchi => tokenContract.balanceOf(aavegotchi.escrow));
-    const lendingStatusPromises = aavegotchis.map(aavegotchi => contract.isAavegotchiLent(aavegotchi.tokenId));
+    const headers = ['Token ID', 'Name', 'Escrow Wallet', `${tokenSymbol} Balance`, 'Status'];
+    for (const headerText of headers) {
+      const th = document.createElement('th');
+      th.innerText = headerText;
+      headerRow.appendChild(th);
+    }
+
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+
+    const balancePromises = [];
+    const lendingStatusPromises = [];
+    for (const aavegotchi of aavegotchis) {
+      balancePromises.push(tokenContract.balanceOf(aavegotchi.escrow));
+      lendingStatusPromises.push(contract.isAavegotchiLent(aavegotchi.tokenId));
+    }
 
     const balances = await Promise.all(balancePromises);
     const lendingStatuses = await Promise.all(lendingStatusPromises);
@@ -409,17 +356,12 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
     }
 
     // Sort owned Gotchis by balance in descending order
-    ownedGotchis.sort((a, b) => (b.balance > a.balance ? 1 : -1));
+    ownedGotchis.sort((a, b) => b.balance > a.balance ? 1 : -1);
 
     // Combine sorted owned Gotchis with rented Gotchis
     const sortedGotchis = [...ownedGotchis, ...rentedGotchis];
 
-    // Fetch token image once
-    const imageUrl = await memoizedGetTokenImageUrl(selectedERC20Address);
-
-    const fragment = document.createDocumentFragment();
-
-    sortedGotchis.forEach(({ aavegotchi, balance, isLent }) => {
+    for (const { aavegotchi, balance, isLent } of sortedGotchis) {
       const row = document.createElement('tr');
 
       const tokenId = aavegotchi.tokenId.toString();
@@ -432,60 +374,104 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
         tokenSymbol: tokenSymbol,
       };
 
-      row.innerHTML = `
-        <td data-label="Token ID">${tokenId}</td>
-        <td data-label="Name">${name}</td>
-        <td data-label="Escrow Wallet">
-          <a href="https://polygonscan.com/address/${escrowWallet}" target="_blank" rel="noopener noreferrer" class="address-link" title="${escrowWallet}">
-            ${shortEscrowWallet}
-          </a>
-          <span class="button-wrapper">
-            <button class="copy-button" data-copy-target="${escrowWallet}" data-tooltip="Copy Escrow Wallet Address">📄</button>
-            <button class="rarity-farming-button" data-escrow-address="${escrowWallet}" data-token-id="${tokenId}" data-gotchi-name="${name}" data-tooltip="View Rarity Farming Deposits">💰</button>
-          </span>
-        </td>
-        <td data-label="${tokenSymbol} Balance">
-          <div class="token-balance">
-            <img src="${imageUrl}" alt="${tokenSymbol}" width="24" height="24" onerror="this.src='path/to/default/token/image.png';">
-            ${ethers.formatUnits(balance, tokenDecimals)}
-          </div>
-        </td>
-        <td data-label="Status" class="${isLent ? 'status-rented' : 'status-owned'}">
-          ${isLent ? 'Rented' : 'Owned'}
-        </td>
-      `;
+      const tokenIdCell = document.createElement('td');
+      tokenIdCell.setAttribute('data-label', 'Token ID');
+      tokenIdCell.innerText = tokenId;
+      row.appendChild(tokenIdCell);
 
-      fragment.appendChild(row);
-    });
+      const nameCell = document.createElement('td');
+      nameCell.setAttribute('data-label', 'Name');
+      nameCell.innerText = name;
+      row.appendChild(nameCell);
 
-    tbody.appendChild(fragment);
+      const escrowCell = document.createElement('td');
+      escrowCell.setAttribute('data-label', 'Escrow Wallet');
+      const escrowLink = document.createElement('a');
+      escrowLink.href = `https://polygonscan.com/address/${escrowWallet}`;
+      escrowLink.target = '_blank';
+      escrowLink.rel = 'noopener noreferrer';
+      escrowLink.className = 'address-link';
+      escrowLink.title = escrowWallet;
+      escrowLink.innerText = shortEscrowWallet;
+      escrowCell.appendChild(escrowLink);
+
+      const buttonWrapper = document.createElement('span');
+      buttonWrapper.className = 'button-wrapper';
+
+      const copyButton = document.createElement('button');
+      copyButton.className = 'copy-button';
+      copyButton.setAttribute('data-copy-target', escrowWallet);
+      copyButton.setAttribute('data-tooltip', 'Copy Escrow Wallet Address');
+      copyButton.innerText = '📄';
+      buttonWrapper.appendChild(copyButton);
+
+      const rarityFarmingButton = document.createElement('button');
+      rarityFarmingButton.className = 'rarity-farming-button';
+      rarityFarmingButton.setAttribute('data-escrow-address', escrowWallet);
+      rarityFarmingButton.setAttribute('data-token-id', tokenId);
+      rarityFarmingButton.setAttribute('data-gotchi-name', name);
+      rarityFarmingButton.setAttribute('data-tooltip', 'View Rarity Farming Deposits');
+      rarityFarmingButton.innerText = '💰';
+      buttonWrapper.appendChild(rarityFarmingButton);
+
+      escrowCell.appendChild(buttonWrapper);
+
+      rarityFarmingButton.addEventListener('click', async () => {
+        const deposits = await fetchRarityFarmingDeposits(escrowWallet);
+        showDeposits(deposits, tokenId, name);
+      });
+
+      row.appendChild(escrowCell);
+
+      const tokenBalanceRaw = balance;
+      const tokenBalance = ethers.formatUnits(tokenBalanceRaw, tokenDecimals);
+      const tokenBalanceCell = document.createElement('td');
+      tokenBalanceCell.setAttribute('data-label', `${tokenSymbol} Balance`);
+      
+      const tokenImage = document.createElement('img');
+      const imageUrl = await getTokenImageUrl(selectedERC20Address);
+      tokenImage.src = imageUrl;
+      tokenImage.alt = tokenSymbol;
+      tokenImage.width = 24;
+      tokenImage.height = 24;
+      tokenImage.onerror = function() {
+        this.onerror = null;
+        this.src = 'path/to/default/token/image.png'; // Use a default image path
+      };
+      
+      const tokenBalanceWrapper = document.createElement('div');
+      tokenBalanceWrapper.className = 'token-balance';
+      tokenBalanceWrapper.appendChild(tokenImage);
+      tokenBalanceWrapper.appendChild(document.createTextNode(tokenBalance));
+      
+      tokenBalanceCell.appendChild(tokenBalanceWrapper);
+      row.appendChild(tokenBalanceCell);
+
+      const statusCell = document.createElement('td');
+      statusCell.setAttribute('data-label', 'Status');
+      if (!isLent) {
+        statusCell.innerText = 'Owned';
+        statusCell.className = 'status-owned';
+      } else {
+        statusCell.innerText = 'Rented';
+        statusCell.className = 'status-rented';
+      }
+      row.appendChild(statusCell);
+
+      tbody.appendChild(row);
+    }
+
+    table.appendChild(tbody);
 
     aavegotchiInfoContainer.innerHTML = `<h2>Your Aavegotchis:</h2>`;
     aavegotchiInfoContainer.appendChild(table);
 
     initializeCopyButtons();
-    attachRarityFarmingButtons();
   } catch (error) {
     console.error('Error fetching Aavegotchis:', error);
     aavegotchiInfoContainer.innerHTML = '<p>Error fetching Aavegotchis. See console for details.</p>';
   }
 }
-
-// Function to Attach Event Listeners to Rarity Farming Buttons
-function attachRarityFarmingButtons() {
-  const rarityFarmingButtons = document.querySelectorAll('.rarity-farming-button');
-  rarityFarmingButtons.forEach(button => {
-    button.addEventListener('click', async () => {
-      const escrowAddress = button.getAttribute('data-escrow-address');
-      const tokenId = button.getAttribute('data-token-id');
-      const name = button.getAttribute('data-gotchi-name');
-
-      const deposits = await fetchRarityFarmingDeposits(escrowAddress);
-      showDeposits(deposits, tokenId, name);
-    });
-  });
-}
-
 // Toast Notification Functions
 function showToast(message, type = 'success') {
   const toast = document.createElement('div');
@@ -655,7 +641,6 @@ async function updateSelectedERC20Token(address) {
     showToast('Failed to fetch ERC20 token details. Ensure the address is correct and the token follows the ERC20 standard.', 'error');
   }
 }
-
 // Function to Generate Method Forms
 async function generateMethodForms() {
   methodFormsContainer.innerHTML = '';
@@ -848,8 +833,7 @@ async function generateMethodForms() {
 
   generateExtraTools(facetMethods, extraMethodNames);
 }
-
-// Function to Generate Extra Tools using innerHTML and DocumentFragment
+// Function to Generate Extra Tools
 function generateExtraTools(facetMethods, extraMethodNames) {
   if (extraMethodNames.length > 0) {
     const extraToolsContainer = document.createElement('div');
@@ -859,10 +843,15 @@ function generateExtraTools(facetMethods, extraMethodNames) {
     extraToolsHeader.className = 'form-header';
     extraToolsHeader.style.cursor = 'pointer';
 
-    extraToolsHeader.innerHTML = `
-      <h3>Extra Tools</h3>
-      <span class="toggle-icon collapsed">&#9660;</span>
-    `;
+    const extraToolsTitle = document.createElement('h3');
+    extraToolsTitle.innerText = 'Extra Tools';
+    extraToolsHeader.appendChild(extraToolsTitle);
+
+    const toggleIcon = document.createElement('span');
+    toggleIcon.className = 'toggle-icon collapsed';
+    toggleIcon.innerHTML = '&#9660;';
+    extraToolsHeader.appendChild(toggleIcon);
+
     extraToolsContainer.appendChild(extraToolsHeader);
 
     const collapsibleContent = document.createElement('div');
@@ -873,31 +862,66 @@ function generateExtraTools(facetMethods, extraMethodNames) {
       const formContainer = document.createElement('div');
       formContainer.className = 'form-container-inner';
 
-      formContainer.innerHTML = `
-        <div class="form-header">
-          <h3>${methodName}</h3>
-          <span class="toggle-icon collapsed">&#9660;</span>
-        </div>
-        <div class="collapsible-content">
-          <form data-method="${methodName}">
-            ${method.inputs.map(input => `
-              <div class="form-group">
-                <label for="${input.name}">${input.name} (${input.type}):</label>
-                ${input.type.endsWith('[]') 
-                  ? `<textarea class="textarea" id="${input.name}" name="${input.name}" placeholder="Enter comma-separated values"></textarea>`
-                  : `<input type="text" class="input" id="${input.name}" name="${input.name}" ${input.type.startsWith('address') ? 'placeholder="0x..."' : ''}>`
-                }
-              </div>
-            `).join('')}
-            <button type="submit" class="button submit-button">Submit</button>
-          </form>
-        </div>
-      `;
+      const formHeader = document.createElement('div');
+      formHeader.className = 'form-header';
 
-      // Attach event listeners
-      const formHeader = formContainer.querySelector('.form-header');
-      const formToggleIcon = formContainer.querySelector('.toggle-icon');
-      const formCollapsibleContent = formContainer.querySelector('.collapsible-content');
+      const formTitle = document.createElement('h3');
+      formTitle.innerText = methodName;
+      formHeader.appendChild(formTitle);
+
+      const formToggleIcon = document.createElement('span');
+      formToggleIcon.className = 'toggle-icon collapsed';
+      formToggleIcon.innerHTML = '&#9660;';
+      formHeader.appendChild(formToggleIcon);
+
+      formContainer.appendChild(formHeader);
+
+      const formCollapsibleContent = document.createElement('div');
+      formCollapsibleContent.className = 'collapsible-content';
+
+      const form = document.createElement('form');
+      form.setAttribute('data-method', methodName);
+      form.addEventListener('submit', handleFormSubmit);
+
+      for (const input of method.inputs) {
+        const formGroup = document.createElement('div');
+        formGroup.className = 'form-group';
+
+        const label = document.createElement('label');
+        label.setAttribute('for', input.name);
+        label.innerText = `${input.name} (${input.type}):`;
+
+        formGroup.appendChild(label);
+
+        let inputElement;
+        if (input.type.endsWith('[]')) {
+          inputElement = document.createElement('textarea');
+          inputElement.className = 'textarea';
+          inputElement.placeholder = 'Enter comma-separated values';
+        } else {
+          inputElement = document.createElement('input');
+          inputElement.type = 'text';
+          inputElement.className = 'input';
+          if (input.type.startsWith('address')) {
+            inputElement.placeholder = '0x...';
+          }
+        }
+
+        inputElement.id = input.name;
+        inputElement.name = input.name;
+        formGroup.appendChild(inputElement);
+        form.appendChild(formGroup);
+      }
+
+      const submitButton = document.createElement('button');
+      submitButton.type = 'submit';
+      submitButton.className = 'button submit-button';
+      submitButton.innerText = 'Submit';
+      form.appendChild(submitButton);
+
+      formCollapsibleContent.appendChild(form);
+      formContainer.appendChild(formCollapsibleContent);
+      collapsibleContent.appendChild(formContainer);
 
       toggleCollapse(formCollapsibleContent, formToggleIcon, false);
 
@@ -905,17 +929,15 @@ function generateExtraTools(facetMethods, extraMethodNames) {
         const isExpanded = formCollapsibleContent.classList.contains('expanded');
         toggleCollapse(formCollapsibleContent, formToggleIcon, !isExpanded);
       });
-
-      collapsibleContent.appendChild(formContainer);
     });
 
     extraToolsContainer.appendChild(collapsibleContent);
     methodFormsContainer.appendChild(extraToolsContainer);
-    toggleCollapse(collapsibleContent, extraToolsContainer.querySelector('.toggle-icon'), false);
+    toggleCollapse(collapsibleContent, toggleIcon, false);
 
     extraToolsHeader.addEventListener('click', () => {
       const isExpanded = collapsibleContent.classList.contains('expanded');
-      toggleCollapse(collapsibleContent, extraToolsContainer.querySelector('.toggle-icon'), !isExpanded);
+      toggleCollapse(collapsibleContent, toggleIcon, !isExpanded);
     });
   }
 }
@@ -1015,7 +1037,7 @@ async function handleFormSubmit(event) {
         const balance = await tokenContract.balanceOf(escrowWallet);
         const symbol = await tokenContract.symbol();
         const name = gotchi.name && gotchi.name.trim() !== '' ? gotchi.name : '(No Name)';
-        return { tokenId, balance, symbol, name };
+return { tokenId, balance, symbol, name };
       });
       const balancesResult = await Promise.all(balancePromises);
       const filteredData = balancesResult.filter(({ balance }) => balance > 0n);
@@ -1132,7 +1154,8 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
 
     const amountInputs = [];
 
-    _tokenIds.forEach((tokenId, index) => {
+    for (let index = 0; index < _tokenIds.length; index++) {
+      const tokenId = _tokenIds[index];
       const balance = individualBalances[index];
       const balanceFormatted = ethers.formatUnits(balance, decimals);
       const name = aavegotchiNames[index] && aavegotchiNames[index].trim() !== '' ? aavegotchiNames[index] : '(No Name)';
@@ -1157,7 +1180,7 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
       formGroup.appendChild(label);
       formGroup.appendChild(input);
       form.appendChild(formGroup);
-    });
+    }
 
     const errorMessage = document.createElement('p');
     errorMessage.className = 'error-message';
@@ -1209,7 +1232,7 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
 
     updateTotal();
 
-    amountInputs.forEach(input => {
+    for (const input of amountInputs) {
       input.addEventListener('input', updateTotal);
       input.addEventListener('blur', () => {
         if (input.value.startsWith('.')) {
@@ -1217,7 +1240,7 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
           updateTotal();
         }
       });
-    });
+    }
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -1226,7 +1249,7 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
       const enteredAmounts = [];
 
       try {
-        _tokenIds.forEach((tokenId, index) => {
+        for (let index = 0; index < amountInputs.length; index++) {
           const input = amountInputs[index];
           let value = input.value.trim();
           if (value.startsWith('.')) {
@@ -1235,24 +1258,25 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
           }
 
           if (!/^\d+(\.\d+)?$/.test(value)) {
-            throw new Error(`Invalid amount entered for Aavegotchi ID ${tokenId}`);
+            throw new Error(`Invalid amount entered for Aavegotchi ID ${_tokenIds[index]}`);
           }
 
           const amount = ethers.parseUnits(value, decimals);
 
           if (amount < 0n || amount > individualBalances[index]) {
-            throw new Error(`Amount for Aavegotchi ID ${tokenId} exceeds available balance.`);
+            throw new Error(`Amount for Aavegotchi ID ${_tokenIds[index]} exceeds available balance.`);
           }
 
           enteredAmounts.push(amount);
           totalEntered += amount;
-        });
+        }
 
         if (totalEntered !== totalTransferAmount) {
           throw new Error('The total of entered amounts does not equal the total amount to withdraw.');
         }
 
         document.body.removeChild(modalOverlay);
+
         resolve(enteredAmounts);
       } catch (error) {
         errorMessage.innerText = error.message;
@@ -1265,7 +1289,6 @@ async function getUserSpecifiedAmounts(_tokenIds, individualBalances, totalTrans
     });
   });
 }
-
 // Function to Toggle Collapse
 function toggleCollapse(contentElement, iconElement, expand) {
   if (expand) {
@@ -1278,6 +1301,27 @@ function toggleCollapse(contentElement, iconElement, expand) {
     iconElement.classList.remove('expanded');
     iconElement.classList.add('collapsed');
     iconElement.innerHTML = '&#9660;';
+  }
+}
+
+// Function to get token image URL
+const tokenImageCache = new Map();
+
+async function getTokenImageUrl(tokenAddress) {
+  if (tokenImageCache.has(tokenAddress)) {
+    return tokenImageCache.get(tokenAddress);
+  }
+
+  try {
+    const response = await fetch(`https://api.coingecko.com/api/v3/coins/polygon-pos/contract/${tokenAddress}`);
+    if (!response.ok) throw new Error('Failed to fetch token data');
+    const data = await response.json();
+    const imageUrl = data.image.small;
+    tokenImageCache.set(tokenAddress, imageUrl);
+    return imageUrl;
+  } catch (error) {
+    console.error('Error fetching token image:', error);
+    return 'path/to/default/token/image.png'; // Use a default image path
   }
 }
 
@@ -1301,21 +1345,6 @@ function initializeCopyButtons() {
           console.error('Failed to copy!', err);
           showToast('Failed to copy the address. Please try again.', 'error');
         });
-    });
-  });
-}
-
-// Function to Attach Rarity Farming Buttons
-function attachRarityFarmingButtons() {
-  const rarityFarmingButtons = document.querySelectorAll('.rarity-farming-button');
-  rarityFarmingButtons.forEach(button => {
-    button.addEventListener('click', async () => {
-      const escrowAddress = button.getAttribute('data-escrow-address');
-      const tokenId = button.getAttribute('data-token-id');
-      const name = button.getAttribute('data-gotchi-name');
-
-      const deposits = await fetchRarityFarmingDeposits(escrowAddress);
-      showDeposits(deposits, tokenId, name);
     });
   });
 }
@@ -1350,9 +1379,15 @@ async function updateMaxButton(form) {
     const tokenContract = new ethers.Contract(erc20Address, ghstABI, provider);
 
     if (tokenIdValue === 'all') {
-      const balancePromises = ownedAavegotchis.map(gotchi => tokenContract.balanceOf(gotchi.escrow));
+      const balancePromises = ownedAavegotchis.map(async (gotchi) => {
+        const escrowWallet = gotchi.escrow;
+        const balance = await tokenContract.balanceOf(escrowWallet);
+        return balance;
+      });
+
       const balances = await Promise.all(balancePromises);
-      const filteredBalances = balances.filter(balance => balance > 0n);
+
+      const filteredBalances = balances.filter((balance) => balance > 0n);
 
       if (filteredBalances.length === 0) {
         maxButton.disabled = true;
@@ -1361,10 +1396,13 @@ async function updateMaxButton(form) {
         return;
       }
 
-      totalBalance = filteredBalances.reduce((acc, balance) => acc + balance, 0n);
+      for (const balance of filteredBalances) {
+        totalBalance += balance;
+      }
+
       maxButton.dataset.maxValue = totalBalance.toString();
     } else {
-      const gotchi = ownedAavegotchis.find(g => g.tokenId.toString() === tokenIdValue);
+      const gotchi = ownedAavegotchis.find((g) => g.tokenId.toString() === tokenIdValue);
       if (!gotchi) throw new Error('Selected Aavegotchi not found.');
       const escrowWallet = gotchi.escrow;
       totalBalance = await tokenContract.balanceOf(escrowWallet);
@@ -1388,6 +1426,7 @@ async function handleMaxButtonClick(form) {
   const maxValue = maxButton.dataset.maxValue;
 
   if (maxValue) {
+    const tokenIdSelect = form.querySelector('select[name="_tokenId"]');
     const erc20ContractSelect = form.querySelector('select[name="_erc20Contract"]');
     const customErc20Input = form.querySelector('input[name="custom-erc20-address"]');
     let erc20Address = erc20ContractSelect ? erc20ContractSelect.value : null;
@@ -1419,26 +1458,39 @@ async function refreshTableBalances() {
     }
 
     const tokenContract = new ethers.Contract(selectedERC20Address, ghstABI, provider);
-    const imageUrl = await memoizedGetTokenImageUrl(selectedERC20Address);
 
-    const balancePromises = Array.from(rows).map(row => {
+    const balancePromises = Array.from(rows).map((row) => {
       const escrowWallet = row.querySelector('td:nth-child(3) a').getAttribute('title');
       return tokenContract.balanceOf(escrowWallet);
     });
 
     const balances = await Promise.all(balancePromises);
 
-    rows.forEach((row, index) => {
+    const imageUrl = await getTokenImageUrl(selectedERC20Address);
+
+    for (let index = 0; index < rows.length; index++) {
+      const row = rows[index];
       const balanceCell = row.querySelector('td:nth-child(4)');
       const formattedBalance = ethers.formatUnits(balances[index], selectedERC20Decimals);
 
-      balanceCell.innerHTML = `
-        <div class="token-balance">
-          <img src="${imageUrl}" alt="${selectedERC20Symbol}" width="24" height="24" onerror="this.src='path/to/default/token/image.png';">
-          ${formattedBalance}
-        </div>
-      `;
-    });
+      const tokenImage = document.createElement('img');
+      tokenImage.src = imageUrl;
+      tokenImage.alt = selectedERC20Symbol;
+      tokenImage.width = 24;
+      tokenImage.height = 24;
+      tokenImage.onerror = function() {
+        this.onerror = null;
+        this.src = 'path/to/default/token/image.png'; // Use a default image path
+      };
+
+      const tokenBalanceWrapper = document.createElement('div');
+      tokenBalanceWrapper.className = 'token-balance';
+      tokenBalanceWrapper.appendChild(tokenImage);
+      tokenBalanceWrapper.appendChild(document.createTextNode(formattedBalance));
+
+      balanceCell.innerHTML = '';
+      balanceCell.appendChild(tokenBalanceWrapper);
+    }
   } catch (error) {
     console.error('Error refreshing table balances:', error);
     showToast('Failed to refresh token balances.', 'error');
