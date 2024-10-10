@@ -267,10 +267,16 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
 
       allDeposits.push(...filteredDeposits);
 
+      // Logging for debugging (optional)
+      console.log(`Page ${page}: Fetched ${data.result.length} transactions, Found ${filteredDeposits.length} deposits`);
+
       // Check if the last transaction fetched is older than one year
       const lastTxTime = parseInt(data.result[data.result.length - 1].timeStamp);
+      console.log(`Last transaction timestamp in this page: ${new Date(lastTxTime * 1000).toLocaleDateString()}`);
+
       if (data.result.length < pageSize || lastTxTime < oneYearAgo) {
         hasMore = false;
+        console.log(`No more pages to fetch. Exiting pagination loop.`);
       } else {
         page += 1;
         // Optional: Delay between requests to respect rate limits
@@ -290,6 +296,7 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
     return [];
   }
 }
+
 
 
 // Helper function to introduce delays
