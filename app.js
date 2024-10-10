@@ -198,33 +198,37 @@ const AAVEGOTCHI_PAYOUT_ADDRESSES = [
   '0xb6384935d68e9858f8385ebeed7db84fc93b1420', // Old Payout Address
 ];
 
+// Helper function to introduce delays
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-// Memoized getTokenImageUrl function
-const memoizedGetTokenImageUrl = (() => {
-  const cache = new Map();
-  return async (tokenAddress) => {
-    if (cache.has(tokenAddress)) {
-      return cache.get(tokenAddress);
-    }
+// Helper function for exponential backoff (optional, enhances rate limit handling)
+async function fetchWithExponentialBackoff(url, retries = 5, delayMs = 500) {
+  for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      const response = await fetch(`https://api.coingecko.com/api/v3/coins/polygon-pos/contract/${tokenAddress}`);
-      if (!response.ok) throw new Error('Failed to fetch token data');
-      const data = await response.json();
-      const imageUrl = data.image.small;
-      cache.set(tokenAddress, imageUrl);
-      return imageUrl;
+      const response = await fetch(url);
+      if (response.status === 429) { // Rate limit error
+        throw new Error('Rate limit exceeded');
+      }
+      return response;
     } catch (error) {
-      console.error('Error fetching token image:', error);
-      return 'path/to/default/token/image.png'; // Use a default image path
+      if (attempt < retries - 1) {
+        const backoffTime = delayMs * Math.pow(2, attempt);
+        console.warn(`Attempt ${attempt + 1} failed. Retrying in ${backoffTime}ms...`);
+        await delay(backoffTime);
+      } else {
+        throw error;
+      }
     }
-  };
-})();
+  }
+}
 
-// Function to fetch rarity farming deposits from two years ago with multiple payout addresses
+// Updated fetchRarityFarmingDeposits function to fetch deposits from one year ago with multiple payout addresses
 async function fetchRarityFarmingDeposits(escrowAddress) {
   const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7'; // GHST token on Polygon
   const currentTime = Math.floor(Date.now() / 1000);
-  const twoYearsAgo = currentTime - 2 * 365 * 24 * 60 * 60; // Subtracting two years in seconds
+  const oneYearAgo = currentTime - 365 * 24 * 60 * 60; // Subtracting one year in seconds
   const pageSize = 1000; // Number of transactions per page
   let page = 1;
   let hasMore = true;
@@ -233,7 +237,12 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
   try {
     while (hasMore) {
       const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&page=${page}&offset=${pageSize}&apikey=${POLYGONSCAN_API_KEY}`;
-      const response = await fetch(url);
+      
+      // Optional: Use fetchWithExponentialBackoff to handle rate limits
+      const response = await fetchWithExponentialBackoff(url);
+      // If you choose not to implement exponential backoff, use the standard fetch:
+      // const response = await fetch(url);
+      
       const data = await response.json();
 
       if (data.status === '0' && data.message === 'No transactions found') {
@@ -248,19 +257,19 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
       // Convert payout addresses to lowercase for comparison
       const lowercasedPayoutAddresses = AAVEGOTCHI_PAYOUT_ADDRESSES.map(addr => addr.toLowerCase());
 
-      // Filter transactions based on multiple payout addresses
+      // Filter transactions based on multiple payout addresses and one-year timeframe
       const filteredDeposits = data.result.filter(tx =>
         tx.to.toLowerCase() === escrowAddress.toLowerCase() &&
         lowercasedPayoutAddresses.includes(tx.from.toLowerCase()) &&
         tx.contractAddress.toLowerCase() === GHST_CONTRACT.toLowerCase() &&
-        parseInt(tx.timeStamp) >= twoYearsAgo
+        parseInt(tx.timeStamp) >= oneYearAgo
       );
 
       allDeposits.push(...filteredDeposits);
 
-      // Check if the last transaction fetched is older than two years
+      // Check if the last transaction fetched is older than one year
       const lastTxTime = parseInt(data.result[data.result.length - 1].timeStamp);
-      if (data.result.length < pageSize || lastTxTime < twoYearsAgo) {
+      if (data.result.length < pageSize || lastTxTime < oneYearAgo) {
         hasMore = false;
       } else {
         page += 1;
@@ -268,6 +277,8 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
         await delay(200); // 200ms delay
       }
     }
+
+    console.log(`Total deposits found: ${allDeposits.length}`);
 
     return allDeposits.map(tx => ({
       hash: tx.hash,
@@ -279,6 +290,7 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
     return [];
   }
 }
+
 
 // Helper function to introduce delays
 function delay(ms) {
