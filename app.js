@@ -220,7 +220,7 @@ const memoizedGetTokenImageUrl = (() => {
 async function fetchRarityFarmingDeposits(escrowAddress) {
   const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7'; // GHST token on Polygon
   const currentTime = Math.floor(Date.now() / 1000);
-  const oneYearAgo = currentTime - 365 * 24 * 60 * 60;
+  const twoYearsAgo = currentTime - 2 * 365 * 24 * 60 * 60; // Subtracting two years in seconds
   const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
 
   try {
