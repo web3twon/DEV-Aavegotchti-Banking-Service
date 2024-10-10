@@ -192,8 +192,12 @@ const POLYGONSCAN_API_KEY = (_0x41cf('0x0') + _0x41cf('0x2') + _0x41cf('0x1'))['
   return String['fromCharCode'](parseInt(_0x2839fc, 0x10));
 });
 
-// Aavegotchi DAO/Project Payout Address
-const AAVEGOTCHI_PAYOUT_ADDRESS = '0x821049b2273b0cCd34a64D1B08A3346F110eCAe2';
+// Aavegotchi DAO/Project Payout Addresses (both old and new)
+const AAVEGOTCHI_PAYOUT_ADDRESSES = [
+  '0x821049b2273b0cCd34a64D1B08A3346F110eCAe2', // New Payout Address
+  '0xb6384935d68e9858f8385ebeed7db84fc93b1420', // Old Payout Address
+];
+
 
 // Memoized getTokenImageUrl function
 const memoizedGetTokenImageUrl = (() => {
@@ -216,50 +220,34 @@ const memoizedGetTokenImageUrl = (() => {
   };
 })();
 
-// Function to fetch rarity farming deposits from two years ago with pagination
+// Function to fetch rarity farming deposits
 async function fetchRarityFarmingDeposits(escrowAddress) {
   const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7'; // GHST token on Polygon
   const currentTime = Math.floor(Date.now() / 1000);
   const twoYearsAgo = currentTime - 2 * 365 * 24 * 60 * 60; // Subtracting two years in seconds
-  const pageSize = 1000; // Number of transactions per page
-  let page = 1;
-  let hasMore = true;
-  let allDeposits = [];
+  const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&apikey=${POLYGONSCAN_API_KEY}`;
 
   try {
-    while (hasMore) {
-      const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&page=${page}&offset=${pageSize}&apikey=${POLYGONSCAN_API_KEY}`;
-      const response = await fetch(url);
-      const data = await response.json();
+    const response = await fetch(url);
+    const data = await response.json();
 
-      if (data.status === '0' && data.message === 'No transactions found') {
-        console.log(`No transactions found for address: ${escrowAddress}`);
-        break;
-      }
-
-      if (data.status !== '1') {
-        throw new Error(`API request failed: ${data.message}`);
-      }
-
-      const filteredDeposits = data.result.filter(tx =>
-        tx.to.toLowerCase() === escrowAddress.toLowerCase() &&
-        tx.from.toLowerCase() === AAVEGOTCHI_PAYOUT_ADDRESS.toLowerCase() &&
-        tx.contractAddress.toLowerCase() === GHST_CONTRACT.toLowerCase() &&
-        parseInt(tx.timeStamp) >= twoYearsAgo
-      );
-
-      allDeposits.push(...filteredDeposits);
-
-      // Check if the last transaction fetched is older than two years
-      const lastTxTime = parseInt(data.result[data.result.length - 1].timeStamp);
-      if (data.result.length < pageSize || lastTxTime < twoYearsAgo) {
-        hasMore = false;
-      } else {
-        page += 1;
-      }
+    if (data.status === '0' && data.message === 'No transactions found') {
+      console.log(`No transactions found for address: ${escrowAddress}`);
+      return [];
     }
 
-    return allDeposits.map(tx => ({
+    if (data.status !== '1') {
+      throw new Error(`API request failed: ${data.message}`);
+    }
+
+    const deposits = data.result.filter(tx =>
+      tx.to.toLowerCase() === escrowAddress.toLowerCase() &&
+      tx.from.toLowerCase() === AAVEGOTCHI_PAYOUT_ADDRESS.toLowerCase() &&
+      tx.contractAddress.toLowerCase() === GHST_CONTRACT.toLowerCase() &&
+      parseInt(tx.timeStamp) >= twoYearsAgo
+    );
+
+    return deposits.map(tx => ({
       hash: tx.hash,
       value: parseFloat(ethers.formatUnits(tx.value, 18)).toFixed(2),
       timestamp: new Date(parseInt(tx.timeStamp) * 1000).toLocaleDateString()
@@ -269,7 +257,6 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
     return [];
   }
 }
-
 
 // Optimized showDeposits function using DocumentFragment and innerHTML
 function showDeposits(deposits, tokenId, name) {
