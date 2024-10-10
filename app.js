@@ -1,8 +1,6 @@
 // app.js
 
-// Ensure ethers.js version 6.13.2 is used
-// Included in your HTML with SRI:
-// <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js" integrity="sha384-gpR0Q6Hx/O+uevlbpbANbS0LWjbejPV1sqD/8w422l/fW8whGY0EPmKw3uG7ACYP" crossorigin="anonymous"></script>
+// Import Ethers.js (already included via CDN in HTML)
 
 // Contract Information
 const contractAddress = '0x86935F11C86623deC8a25696E1C19a8659CbF95d';
@@ -173,31 +171,12 @@ connectWalletButton.addEventListener('click', connectWallet);
 
 // Constants for Rarity Farming
 const RARITY_FARMING_FUNCTION = '0xea20c3c6';
-// Obfuscated API Key (this is a basic obfuscation, not secure for client-side use)
-const _0x5a8e = ['4e524e4d3347465456', '52131', '4e524654393933464b4641364634594d31424d4734504b434b'];
-(function(_0x39cef8, _0x5a8eb9) {
-  const _0x41cf84 = function(_0x2839fc) {
-    while (--_0x2839fc) {
-      _0x39cef8.push(_0x39cef8.shift());
-    }
-  };
-  _0x41cf84(++_0x5a8eb9);
-}(_0x5a8e, 0xf3));
-const _0x41cf = function(_0x39cef8, _0x5a8eb9) {
-  _0x39cef8 = _0x39cef8 - 0x0;
-  let _0x41cf84 = _0x5a8e[_0x39cef8];
-  return _0x41cf84;
-};
-const POLYGONSCAN_API_KEY = (_0x41cf('0x0') + _0x41cf('0x2') + _0x41cf('0x1'))['replace'](/(.{2})/g, function(_0x2839fc) {
-  return String['fromCharCode'](parseInt(_0x2839fc, 0x10));
-});
 
 // Aavegotchi DAO/Project Payout Addresses (both old and new)
 const AAVEGOTCHI_PAYOUT_ADDRESSES = [
   '0x821049b2273b0cCd34a64D1B08A3346F110eCAe2', // New Payout Address
   '0xb6384935d68e9858f8385ebeed7db84fc93b1420', // Old Payout Address
 ];
-
 
 // Memoized getTokenImageUrl function
 const memoizedGetTokenImageUrl = (() => {
@@ -215,16 +194,16 @@ const memoizedGetTokenImageUrl = (() => {
       return imageUrl;
     } catch (error) {
       console.error('Error fetching token image:', error);
-      return 'path/to/default/token/image.png'; // Use a default image path
+      return 'default-token-image.png'; // Ensure you have a default image at this path
     }
   };
 })();
 
-// Function to fetch rarity farming deposits from two years ago with multiple payout addresses
+// Function to fetch rarity farming deposits from one year ago with multiple payout addresses
 async function fetchRarityFarmingDeposits(escrowAddress) {
   const GHST_CONTRACT = '0x385Eeac5cB85A38A9a07A70c73e0a3271CfB54A7'; // GHST token on Polygon
   const currentTime = Math.floor(Date.now() / 1000);
-  const twoYearsAgo = currentTime - 2 * 365 * 24 * 60 * 60; // Subtracting two years in seconds
+  const oneYearAgo = currentTime - 365 * 24 * 60 * 60; // Subtracting one year in seconds
   const pageSize = 1000; // Number of transactions per page
   let page = 1;
   let hasMore = true;
@@ -232,8 +211,13 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
 
   try {
     while (hasMore) {
-      const url = `https://api.polygonscan.com/api?module=account&action=tokentx&address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&page=${page}&offset=${pageSize}&apikey=${POLYGONSCAN_API_KEY}`;
-      const response = await fetch(url);
+      const url = `/api/polygon/tokenTx?address=${escrowAddress}&startblock=0&endblock=999999999&sort=desc&page=${page}&offset=${pageSize}`;
+      
+      // Use fetchWithExponentialBackoff to handle rate limits
+      const response = await fetchWithExponentialBackoff(url);
+      // If you choose not to implement exponential backoff, use the standard fetch:
+      // const response = await fetch(url);
+      
       const data = await response.json();
 
       if (data.status === '0' && data.message === 'No transactions found') {
@@ -248,26 +232,34 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
       // Convert payout addresses to lowercase for comparison
       const lowercasedPayoutAddresses = AAVEGOTCHI_PAYOUT_ADDRESSES.map(addr => addr.toLowerCase());
 
-      // Filter transactions based on multiple payout addresses
+      // Filter transactions based on multiple payout addresses and one-year timeframe
       const filteredDeposits = data.result.filter(tx =>
         tx.to.toLowerCase() === escrowAddress.toLowerCase() &&
         lowercasedPayoutAddresses.includes(tx.from.toLowerCase()) &&
         tx.contractAddress.toLowerCase() === GHST_CONTRACT.toLowerCase() &&
-        parseInt(tx.timeStamp) >= twoYearsAgo
+        parseInt(tx.timeStamp) >= oneYearAgo
       );
 
       allDeposits.push(...filteredDeposits);
 
-      // Check if the last transaction fetched is older than two years
+      // Logging for debugging (optional)
+      console.log(`Page ${page}: Fetched ${data.result.length} transactions, Found ${filteredDeposits.length} deposits`);
+
+      // Check if the last transaction fetched is older than one year
       const lastTxTime = parseInt(data.result[data.result.length - 1].timeStamp);
-      if (data.result.length < pageSize || lastTxTime < twoYearsAgo) {
+      console.log(`Last transaction timestamp in this page: ${new Date(lastTxTime * 1000).toLocaleDateString()}`);
+
+      if (data.result.length < pageSize || lastTxTime < oneYearAgo) {
         hasMore = false;
+        console.log(`No more pages to fetch. Exiting pagination loop.`);
       } else {
         page += 1;
         // Optional: Delay between requests to respect rate limits
         await delay(200); // 200ms delay
       }
     }
+
+    console.log(`Total deposits found: ${allDeposits.length}`);
 
     return allDeposits.map(tx => ({
       hash: tx.hash,
@@ -280,9 +272,25 @@ async function fetchRarityFarmingDeposits(escrowAddress) {
   }
 }
 
-// Helper function to introduce delays
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+// Helper function for exponential backoff
+async function fetchWithExponentialBackoff(url, retries = 5, delayMs = 500) {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const response = await fetch(url);
+      if (response.status === 429) { // Rate limit error
+        throw new Error('Rate limit exceeded');
+      }
+      return response;
+    } catch (error) {
+      if (attempt < retries - 1) {
+        const backoffTime = delayMs * Math.pow(2, attempt);
+        console.warn(`Attempt ${attempt + 1} failed. Retrying in ${backoffTime}ms...`);
+        await delay(backoffTime);
+      } else {
+        throw error;
+      }
+    }
+  }
 }
 
 // Optimized showDeposits function using DocumentFragment and innerHTML
@@ -291,7 +299,7 @@ function showDeposits(deposits, tokenId, name) {
   modalOverlay.className = 'modal-overlay';
 
   const modalContent = document.createElement('div');
-  modalContent.className = 'modal-content centered-content';
+  modalContent.className = 'modal-content';
 
   const fragment = document.createDocumentFragment();
   fragment.appendChild(document.createElement('h2')).innerText = `Rarity Farming Deposits for Aavegotchi #${tokenId} (${name})`;
@@ -300,7 +308,7 @@ function showDeposits(deposits, tokenId, name) {
     fragment.appendChild(document.createElement('p')).innerText = 'No rarity farming deposits found in the past year.';
   } else {
     const table = document.createElement('table');
-    table.className = 'deposit-table centered-table';
+    table.className = 'deposit-table';
 
     table.innerHTML = `
       <thead>
@@ -331,7 +339,7 @@ function showDeposits(deposits, tokenId, name) {
   }
 
   const closeButton = document.createElement('button');
-  closeButton.className = 'button centered-button';
+  closeButton.className = 'button';
   closeButton.innerText = 'Close';
   closeButton.addEventListener('click', () => {
     document.body.removeChild(modalOverlay);
@@ -439,14 +447,14 @@ async function fetchAndDisplayAavegotchis(ownerAddress) {
             ${shortEscrowWallet}
           </a>
           <span class="button-wrapper">
-            <button class="copy-button" data-copy-target="${escrowWallet}" data-tooltip="Copy Escrow Wallet Address">📄</button>
-            <button class="rarity-farming-button" data-escrow-address="${escrowWallet}" data-token-id="${tokenId}" data-gotchi-name="${name}" data-tooltip="View Rarity Farming Deposits">💰</button>
+            <button class="copy-button" data-copy-target="${escrowWallet}" title="Copy Escrow Wallet Address">📄</button>
+            <button class="rarity-farming-button" data-escrow-address="${escrowWallet}" data-token-id="${tokenId}" data-gotchi-name="${name}" title="View Rarity Farming Deposits">💰</button>
           </span>
         </td>
         <td data-label="${tokenSymbol} Balance">
           <div class="token-balance">
-            <img src="${imageUrl}" alt="${tokenSymbol}" width="24" height="24" onerror="this.src='path/to/default/token/image.png';">
             ${ethers.formatUnits(balance, tokenDecimals)}
+            <img src="${imageUrl}" alt="${tokenSymbol}" width="24" height="24" onerror="this.src='default-token-image.png';">
           </div>
         </td>
         <td data-label="Status" class="${isLent ? 'status-rented' : 'status-owned'}">
@@ -1001,7 +1009,7 @@ async function handleFormSubmit(event) {
       methodName = 'batchTransferEscrow';
       method = facetMethods[methodName];
 
-      let _tokenIds = ownedAavegotchis.map((gotchi) => ethers.getBigInt(gotchi.tokenId));
+      let _tokenIds = ownedAavegotchis.map((gotchi) => ethers.BigInt(gotchi.tokenId));
 
       if (_tokenIds.length === 0) {
         throw new Error('You do not own any Aavegotchis.');
@@ -1009,7 +1017,7 @@ async function handleFormSubmit(event) {
 
       const tokenContract = new ethers.Contract(erc20ContractAddress, ghstABI, provider);
       const balancePromises = _tokenIds.map(async (tokenId) => {
-        const gotchi = ownedAavegotchis.find((g) => ethers.getBigInt(g.tokenId) === tokenId);
+        const gotchi = ownedAavegotchis.find((g) => ethers.BigInt(g.tokenId) === tokenId);
         const escrowWallet = gotchi.escrow;
         const balance = await tokenContract.balanceOf(escrowWallet);
         const symbol = await tokenContract.symbol();
@@ -1065,7 +1073,7 @@ async function handleFormSubmit(event) {
       args.push(_recipients);
       args.push(_transferAmounts);
     } else {
-      const _tokenId = ethers.getBigInt(tokenIdValue);
+      const _tokenId = ethers.BigInt(tokenIdValue);
       args.push(_tokenId);
 
       const ownedTokenIds = ownedAavegotchis.map((gotchi) => gotchi.tokenId.toString());
@@ -1433,89 +1441,11 @@ async function refreshTableBalances() {
 
       balanceCell.innerHTML = `
         <div class="token-balance">
-          <img src="${imageUrl}" alt="${selectedERC20Symbol}" width="24" height="24" onerror="this.src='path/to/default/token/image.png';">
+          <img src="${imageUrl}" alt="${selectedERC20Symbol}" width="24" height="24" onerror="this.src='default-token-image.png';">
           ${formattedBalance}
         </div>
       `;
     });
   } catch (error) {
     console.error('Error refreshing table balances:', error);
-    showToast('Failed to refresh token balances.', 'error');
-  }
-}
-
-// Debounce function
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}
-
-// Debounced version of the updateSelectedERC20Token function
-const debouncedUpdateERC20Token = debounce(async (address) => {
-  if (address === '' || address.length < 42) {
-    // Reset to default GHST token
-    selectedERC20Address = ghstContractAddress;
-    selectedERC20Symbol = 'GHST';
-    selectedERC20Decimals = 18;
-  } else {
-    const formattedAddress = validateAndFormatERC20Address(address);
-    if (formattedAddress) {
-      try {
-        await updateSelectedERC20Token(formattedAddress);
-      } catch (error) {
-        console.error('Error updating ERC20 token:', error);
-        showToast('Invalid ERC20 token address.', 'error');
-      }
-    } else {
-      showToast('Invalid ERC20 address format.', 'error');
-    }
-  }
-
-  // Update table header
-  const tableHeader = document.querySelector('.aavegotchi-table th:nth-child(4)');
-  if (tableHeader) {
-    tableHeader.innerText = `${selectedERC20Symbol} Balance`;
-  }
-
-  // Refresh table balances
-  await refreshTableBalances();
-}, 500); // 500ms debounce time
-
-// Update the event listener for custom ERC20 address input
-document.addEventListener('input', (event) => {
-  if (event.target.id === 'custom-erc20-address') {
-    const customAddress = event.target.value.trim();
-    debouncedUpdateERC20Token(customAddress);
-  }
-});
-
-// Function to validate and format ERC20 address input
-function validateAndFormatERC20Address(input) {
-  const address = input.trim();
-  if (ethers.isAddress(address)) {
-    return ethers.getAddress(address); // This returns the checksum address
-  }
-  return null;
-}
-
-// Error handling function
-function handleError(error) {
-  console.error('An error occurred:', error);
-  showToast(`Error: ${error.message || 'Unknown error occurred'}`, 'error');
-}
-
-// Initial call to generate method forms if the wallet is already connected
-window.onload = async () => {
-  if (window.ethereum && window.ethereum.selectedAddress) {
-    await connectWallet();
-  }
-};
-
-console.log('app.js loaded');
+   
